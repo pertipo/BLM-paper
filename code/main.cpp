@@ -59,7 +59,7 @@ class TelescopicStep {
         if(net != NULL) {
             int moves = 0;
             for(int l=1; l<net->neurons.size(); l++) {
-                moves += net->neurons[l].size() * net->neurons[l-1].size() * net->current_bits[l];
+                moves += net->neurons[l].size() * net->neurons[l-1].size() * net->current_bits[l-1];
             }
             this->moves=moves;
             this->computeThreshold();
@@ -136,7 +136,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
     //1. max number of iteration
     //2. max time has passed
     //3. no improving move found with maximum number of bits
-    while(((in->max_iter == -1) || (iterations++ < in->max_iter)) && ((in->time == -1) || (clock() < in->time))) {
+    while(((in->max_iter == -1) || (iterations < in->max_iter)) && ((in->time == -1) || (clock() < in->time))) {
+        iterations++;
         //two possible modes
         //1. look for the best improving move --> need to check all possible moves and find the best one
         //2. look for the first improving move --> test random the positions untill the stepper tells it's enough or an improving move is found
