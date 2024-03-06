@@ -554,6 +554,9 @@ class Network {
         void init(Init* in, ExampleSet* ex_set) {
             //need to initialize network == neuron structure + general parameters + input data  
             
+            //start random number generator with given seed 
+            srand(in->r_seed);
+
             //general parameters initialization
             //the weight range is simply present in the init instance
             this->w_range=in->w_range;
