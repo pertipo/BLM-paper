@@ -181,7 +181,7 @@ class Init {
 
             auto current_file = files.find("in_example_f"); //compulsory parameter == if absent throw error
             if(current_file==files.end()) {
-                std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                std::cerr << "ERROR" << std::endl << "Compulsory parameter \"in_example_f\" omitted in command file: " << path << std::endl;
                 exit(1);
             }
             this->in_example_f = current_file->second;            
@@ -198,7 +198,7 @@ class Init {
                 
                 current_dir = directives.find("n_neur"); //compulsory parameter == if absent throw error
                 if(current_dir==directives.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"n_neur\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 for(auto i=current_dir->second.begin(); i!=current_dir->second.end(); i++) {
@@ -207,7 +207,7 @@ class Init {
 
                 current_dir = directives.find("d_bits"); //compulsory parameter == if absent throw error
                 if(current_dir==directives.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"d_bits\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 for(auto i=current_dir->second.begin(); i!=current_dir->second.end(); i++) {
@@ -216,7 +216,7 @@ class Init {
 
                 current_dir = directives.find("n_h_l"); //compulsory parameter == if absent throw error
                 if(current_dir==directives.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"n_h_l\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 this->n_h_l = *current_dir->second.begin();
@@ -254,14 +254,14 @@ class Init {
                 
                 current_dir = directives.find("w_ini"); //compulsory parameter == if absent throw error
                 if(current_dir==directives.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"w_ini\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 this->w_ini = *current_dir->second.begin();
                 
                 current_dir = directives.find("w_range"); //compulsory parameter == if absent throw error
                 if(current_dir==directives.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"w_range\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 this->w_range = *current_dir->second.begin();
@@ -272,7 +272,7 @@ class Init {
             } else { //network initialization from file == some compulsory parameters (for the std init) are optional + one compulsory parameter needed
                 current_file = files.find("in_struct_f"); //compulsory parameter == if absent throw error
                 if(current_file==files.end()) {
-                    std::cerr << "ERROR" << std::endl << "Compulsory parameter omitted in command file: " << path << std::endl;
+                    std::cerr << "ERROR" << std::endl << "Compulsory parameter \"in_struct_f\" omitted in command file: " << path << std::endl;
                     exit(1);
                 }
                 this->in_struct_f = current_file->second;
