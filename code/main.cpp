@@ -320,7 +320,7 @@ int main(int argc, char* argv[]) {
     Network net;
 
     //decide if the network structure must be initialized from scratch or loaded from a file
-    if(in.load_structure) {
+    if(!in.load_structure) {
         net.init(&in, &ex_set);
     } else {
         net.loadFromFile(&in, &ex_set);
