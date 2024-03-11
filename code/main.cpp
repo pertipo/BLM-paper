@@ -30,7 +30,7 @@ class TelescopicStep {
     //function that computes the threshold for the iterations analyzed
     //it is based on the possible moves and the apposite parameters
     void computeThreshold() {
-        int k=floor(this->moves*this->moves_fraction);
+        float k=floor(this->moves*this->moves_fraction);
         vector<float> a;
         a.push_back(0);
         for(int n=0; n<this->moves-k; n++) {
@@ -39,7 +39,7 @@ class TelescopicStep {
 
         this->threshold=0;
         for(int n=1; n<=this->moves-k; n++) {
-            this->threshold= a[n]+(((n+k+k)/n+k)*this->threshold);
+            this->threshold= a[n]+(((n+k+k)/(n+k))*this->threshold);
         }
     }
 
