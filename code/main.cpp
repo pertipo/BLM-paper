@@ -125,7 +125,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
     //iteration counter
     int iterations = 0;
     //initial best error found evaluating the network after an initialization
-    float best_err = error(&(net->eval(NULL,0)), ex_set);
+    vector<vector<float>> out = net->eval(NULL,0);
+    float best_err = error(&out, ex_set);
     //initiate the stepper using the constants declared
     //used only in the not-d_all mode
     TelescopicStep stepper = TelescopicStep(DECAY_FACTOR, MOVES_FRACTION, net);
@@ -234,7 +235,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             bit=best_position[3];
             int pos[3] = {l,n,w};
             //change the specified bit and evaluate the error
-            float err = error(&(net->eval(pos, net->change(pos, bit))), ex_set);
+            vector<vector<float>> out = net->eval(pos, net->change(pos, bit));
+            float err = error(&out, ex_set);
             
             //confront and update best error
             if(err < best_err) {
@@ -264,7 +266,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
 
             //change that bit + evaluate and see the new error
             int pos[3] = {r_layer,r_neuron,r_weight};
-            float err = error(&(net->eval(pos, net->change(pos, r_bit))), ex_set);
+            vector<vector<float>> out = net->eval(pos, net->change(pos, r_bit));
+            float err = error(&out, ex_set);
 
             //confront & update error
             if(err < best_err) { //improving step found
@@ -335,7 +338,8 @@ int main(int argc, char* argv[]) {
         cout << "Training completed."; 
     } else {
         cout << "Starting evaluation..." << endl;
-        err = error(&(net.eval(NULL, 0)), &ex_set);
+        vector<vector<float>> out = net.eval(NULL,0);
+        err = error(&out, &ex_set);
         cout << "Evaluation completed.";
     }
     cout << "\tAverage error: " << err << endl;

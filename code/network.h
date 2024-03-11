@@ -822,7 +822,7 @@ class Network {
 
             //if the init structure already contains specified values for the parameter those have the priority
             //otherwise use the one specified in the json file
-            this->w_range=(in->w_range == 0)? data["w_range"] : in->w_range;
+            this->w_range=(in->w_range == 0)? (float)data["w_range"] : in->w_range;
             if(!in->d_bits.empty()) {
                 for(auto bit=in->d_bits.begin(); bit!=in->d_bits.end(); bit++) {
                     this->bit_limits.push_back(*bit);
