@@ -10,8 +10,8 @@
 //TODO handle public fragments of classes
 
 //Thresholds used to simplify calculations in the logistic function
-#define NEGATIVE_TRESHOLD 10000.
-#define POSITIVE_TRESHOLD -10000.
+#define NEGATIVE_TRESHOLD -10000.
+#define POSITIVE_TRESHOLD 10000.
 
 //Transfer function implemented and selectable
 //same transfer is used ofr the input layer (as its data need to be unchanged) and as a default in case of errors

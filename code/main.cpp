@@ -154,7 +154,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             } else {
                 //set current position so as to go in order
                 //try next bit in the same weight 
-                if(current_position[3] < (net->bit_limits[current_position[0]]-1)) {
+                if(current_position[3] < (net->bit_limits[current_position[0]-1]-1)) {
                     //there is at least one bit still unchecked 
                     current_position[3]++;
                 } else {
@@ -235,7 +235,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             bit=best_position[3];
             int pos[3] = {l,n,w};
             //change the specified bit and evaluate the error
-            vector<vector<float>> out = net->eval(pos, net->change(pos, bit));
+            out = net->eval(pos, net->change(pos, bit));
             float err = error(&out, ex_set);
             
             //confront and update best error
@@ -255,18 +255,18 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             int r_layer = rand() % (net->neurons.size()-1) +1; //need to skip first layer == input layer has no weight
             int r_neuron = rand() % (net->neurons[r_layer].size());
             int r_weight = rand() % (net->neurons[r_layer][r_neuron].weights_and_inputs.size());
-            int r_bit = rand() % (net->current_bits[r_layer]) + (net->bit_limits[r_layer] - net->current_bits[r_layer]); //need to modify only the current_bits most significant bits of the weight
+            int r_bit = rand() % (net->current_bits[r_layer-1]) + (net->bit_limits[r_layer-1] - net->current_bits[r_layer-1]); //need to modify only the current_bits most significant bits of the weight
             while(positions.find({r_layer,r_neuron,r_weight,r_bit})!=positions.end()) {
                 r_layer = rand() % (net->neurons.size()-1) +1; 
                 r_neuron = rand() % (net->neurons[r_layer].size());
                 r_weight = rand() % (net->neurons[r_layer][r_neuron].weights_and_inputs.size());
-                r_bit = rand() % (net->current_bits[r_layer]) + (net->bit_limits[r_layer] - net->current_bits[r_layer]); 
+                r_bit = rand() % (net->current_bits[r_layer-1]) + (net->bit_limits[r_layer-1] - net->current_bits[r_layer-1]); 
             }
             positions.insert({r_layer,r_neuron,r_weight,r_bit});
 
             //change that bit + evaluate and see the new error
             int pos[3] = {r_layer,r_neuron,r_weight};
-            vector<vector<float>> out = net->eval(pos, net->change(pos, r_bit));
+            out = net->eval(pos, net->change(pos, r_bit));
             float err = error(&out, ex_set);
 
             //confront & update error
