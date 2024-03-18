@@ -289,6 +289,11 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                 net->change(pos, r_bit);
                 //make a step and check result
                 if(stepper.needBitIncrease()) { //telescopic threshold reached
+                    //save results obtained so far
+                    cout << "Saving partial results..." << endl;
+                    net->saveToFile(in, ex_set);
+                    cout << "Save completed" << endl << endl;
+
                     //increase bits or end training
                     if(*max_element(net->bit_limits.begin(), net->bit_limits.end()) == *max_element(net->current_bits.begin(), net->current_bits.end())) { //bit limit already reached everywhere
                         return best_err;
