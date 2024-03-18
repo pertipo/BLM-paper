@@ -792,8 +792,33 @@ class Network {
                 out << "}" << std::endl;
             }
 
-            //save results of the network
-            std::ofstream r_out(in->out_results_f);
+            //save results of the network, both partial and complete
+            //they are partials if and only if the max(current bit) != max(bit limit)
+            std::string path;
+            int curr_max = *std::max_element(this->current_bits.begin(), this->current_bits.end());
+            if(*std::max_element(this->bit_limits.begin(), this->bit_limits.end()) == curr_max) {
+                path = in->out_results_f;
+            } else {
+                //find the folder where the file should be saved and create the partial path depending on the current bit
+                std::stringstream folder(in->out_results_f);
+                //control is used to ignore the last component of the path (a.k.a the file name)
+                //therefore it is kept one component ahead
+                std::stringstream control(in->out_results_f);
+                std::string buff;
+                std::getline(control, buff, '/');
+                while(std::getline(control, buff, '/')) {
+                    std::getline(folder, buff, '/');
+                    //insert the component extracted from the original path in the desired one
+                    path += buff;
+                    path += "/";
+                }
+                //insert the partial output filename
+                path += "partial_outputs_";
+                path += std::to_string(curr_max); 
+                path += ".exa";
+            }
+            //actual outputs printing on the correct file
+            std::ofstream r_out(path);
             r_out << "n_inp " << ex_set->examples[0].input.size() << std::endl;
             r_out << "n_out " << ex_set->examples[0].label.size() << std::endl;
             r_out << "n_patt " << ex_set->examples.size() << std::endl;
