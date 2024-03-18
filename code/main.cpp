@@ -1,5 +1,6 @@
 #include <set>
 #include "network.h"
+#include <random>
 
 //constant used to decide how often the reports of the training are printed == it's a percentage
 #define REPORT_EACH_UPDATE_PERCENTAGE 10
@@ -113,10 +114,22 @@ float error(vector<vector<float>>* res, ExampleSet* ex_set) {
 //it is based on the network structure in the apposite library
 float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-thread and keep_dens
     srand(time(0));
-    //need a set of already used positions in order to avoid repeating the same study multiple times
-    //it will be erased each time an improving position is found
-    //used only in the not-d_all mode
-    set<vector<int>> positions;
+    random_device rd;
+    mt19937 g(rd()); 
+    //need a vector of not-used positions in order to avoid repeating the same study multiple times
+    //it will be reset each time an improving position is found
+    vector<vector<int>> positions;
+    //insert each available position in the list
+    for(int l=0; l<in->n_h_l; l++) {
+        for(int n=0; n<net->neurons[l+1].size(); n++) {
+            for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
+                for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
+                    positions.push_back({l+1,n,w,b});
+                }
+            }
+        }
+    }
+    
     //position of the best weight change formatted as [layer,neuron,weight,bit]
     //used only in the d_all mode
     vector<int> best_position;
@@ -251,18 +264,14 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
         } else {
             //look for first improving move
             
-            //generate a random position absent in the set
-            int r_layer = rand() % (net->neurons.size()-1) +1; //need to skip first layer == input layer has no weight
-            int r_neuron = rand() % (net->neurons[r_layer].size());
-            int r_weight = rand() % (net->neurons[r_layer][r_neuron].weights_and_inputs.size());
-            int r_bit = rand() % (net->current_bits[r_layer-1]) + (net->bit_limits[r_layer-1] - net->current_bits[r_layer-1]); //need to modify only the current_bits most significant bits of the weight
-            while(positions.find({r_layer,r_neuron,r_weight,r_bit})!=positions.end()) {
-                r_layer = rand() % (net->neurons.size()-1) +1; 
-                r_neuron = rand() % (net->neurons[r_layer].size());
-                r_weight = rand() % (net->neurons[r_layer][r_neuron].weights_and_inputs.size());
-                r_bit = rand() % (net->current_bits[r_layer-1]) + (net->bit_limits[r_layer-1] - net->current_bits[r_layer-1]); 
-            }
-            positions.insert({r_layer,r_neuron,r_weight,r_bit});
+            //generate a random position == shuffle the vector of all positions and extract the first
+            shuffle(positions.begin(), positions.end(), g);
+            int r_layer = positions[0][0];
+            int r_neuron = positions[0][1];
+            int r_weight = positions[0][2];
+            int r_bit = positions[0][3];
+            //remove position as it was tested
+            positions.erase(positions.begin());
 
             //change that bit + evaluate and see the new error
             int pos[3] = {r_layer,r_neuron,r_weight};
@@ -282,6 +291,15 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                 }
                 //reset positions
                 positions.clear();
+                for(int l=0; l<in->n_h_l; l++) {
+                    for(int n=0; n<net->neurons[l+1].size(); n++) {
+                        for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
+                            for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
+                                positions.push_back({l+1,n,w,b});
+                            }
+                        }
+                    }
+                }
                 //reset stepper without giving the network == don't need to update the threshold
                 stepper.reset(NULL);
             } else { //modification was a failure
@@ -302,6 +320,17 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                             //check if limit is already reached
                             if(net->current_bits[bit] != net->bit_limits[bit]) {
                                 net->current_bits[bit]++;
+                            }
+                        }
+                    }
+                    //reset positions
+                    positions.clear();
+                    for(int l=0; l<in->n_h_l; l++) {
+                        for(int n=0; n<net->neurons[l+1].size(); n++) {
+                            for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
+                                for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
+                                    positions.push_back({l+1,n,w,b});
+                                }
                             }
                         }
                     }
