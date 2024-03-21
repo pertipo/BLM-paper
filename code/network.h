@@ -775,20 +775,23 @@ class Network {
                 out << "\t" << "]," << std::endl;
                 out << "\t" << "\"bit_limits\": [";
                 for(int i=0; i<this->bit_limits.size(); i++) {
-                    out << this->bit_limits[i] << ", ";
+                    if(i!=0) {out << ", ";}
+                    out << this->bit_limits[i];
                 }
-                out << "\t" << "]," << std::endl;
+                out << "]," << std::endl;
                 out << "\t" << "\"current_bits\": [";
                 for(int i=0; i<this->current_bits.size(); i++) {
-                    out << this->current_bits[i] << ", ";
+                    if(i!=0) {out << ", ";}
+                    out << this->current_bits[i];
                 }
-                out << "\t" << "]," << std::endl;
-                out << "\t" << "w_range:" << this->w_range << "," << std::endl;
+                out << "]," << std::endl;
+                out << "\t" << "\"w_range\": " << this->w_range << "," << std::endl;
                 out << "\t" << "\"atransf\": [";
                 for(int i=0; i<in->atransf.size(); i++) {
-                    out << in->atransf[i] << ", ";
+                    if(i!=0) {out << ", ";}
+                    out << in->atransf[i];
                 }
-                out << "\t" << "]" << std::endl;
+                out << "]" << std::endl;
                 out << "}" << std::endl;
             }
 
@@ -822,15 +825,16 @@ class Network {
             r_out << "n_inp " << ex_set->examples[0].input.size() << std::endl;
             r_out << "n_out " << ex_set->examples[0].label.size() << std::endl;
             r_out << "n_patt " << ex_set->examples.size() << std::endl;
+            r_out.precision(5);
             for(int ex=0; ex<ex_set->examples.size(); ex++) {
                 r_out << "pattern ";
                 for(auto inp=ex_set->examples[ex].input.begin(); inp!=ex_set->examples[ex].input.end(); inp++) {
-                    r_out << (*inp) << "\t";
+                    r_out << std::fixed << (*inp) << " ";
                 }
                 
 
                 for(auto o_channel=this->neurons.back().begin(); o_channel!=this->neurons.back().end(); o_channel++) {
-                    r_out << (*o_channel).outputs.values(true)[ex] << "\t";
+                    r_out << std::fixed << (*o_channel).outputs.values(true)[ex] << " ";
                 }
                 r_out << std::endl;
             }   

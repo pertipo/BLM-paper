@@ -379,7 +379,7 @@ int main(int argc, char* argv[]) {
     cout << "\tAverage error: " << err << endl;
 
     //save results and eventually the structure of the network
-    cout << "Saving redults in: " << in.out_results_f << endl;
+    cout << "Saving results in: " << in.out_results_f << endl;
     if(in.save_structure) {cout << "Saving structure in: " << in.out_struct_f << endl;}
     net.saveToFile(&in, &ex_set);
     cout << "Saving completed." << endl << endl;
