@@ -748,9 +748,55 @@ class Network {
         //function that saves the fundamental components of the network structure to the specified json file and the outputs of the network to the specified .exa file
         //layout of saved data is specified in the documentation
         void saveToFile(Init* in, ExampleSet* ex_set) {
+            int curr_max = *std::max_element(this->current_bits.begin(), this->current_bits.end());
+            //we are saving partials results and structure if and only if the max(current bit) != max(bit limit)
+            //need to chose were to save
+            std::string s_path;
+            std::string r_path;
+            if(*std::max_element(this->bit_limits.begin(), this->bit_limits.end()) != curr_max) {
+                //find the folder where the struct file should be saved and create the partial path depending on the current bit
+                std::stringstream s_folder(in->out_struct_f);
+                //control is used to ignore the last component of the path (a.k.a the file name)
+                //therefore it is kept one component ahead
+                std::stringstream s_control(in->out_struct_f);
+                std::string s_buff;
+                std::getline(s_control, s_buff, '/');
+                while(std::getline(s_control, s_buff, '/')) {
+                    std::getline(s_folder, s_buff, '/');
+                    //insert the component extracted from the original path in the desired one
+                    s_path += s_buff;
+                    s_path += "/";
+                }
+                //insert the partial output filename
+                s_path += "partial_structure_";
+                s_path += std::to_string(curr_max); 
+                s_path += ".json";
+                
+                //find the folder where the results file should be saved and create the partial path depending on the current bit
+                std::stringstream r_folder(in->out_results_f);
+                //control is used to ignore the last component of the path (a.k.a the file name)
+                //therefore it is kept one component ahead
+                std::stringstream r_control(in->out_results_f);
+                std::string r_buff;
+                std::getline(r_control, r_buff, '/');
+                while(std::getline(r_control, r_buff, '/')) {
+                    std::getline(r_folder, r_buff, '/');
+                    //insert the component extracted from the original path in the desired one
+                    r_path += r_buff;
+                    r_path += "/";
+                }
+                //insert the partial output filename
+                r_path += "partial_outputs_";
+                r_path += std::to_string(curr_max); 
+                r_path += ".exa";
+            } else {
+                s_path = in->out_struct_f;
+                r_path = in->out_results_f;
+            }
+
             if(in->save_structure) {
-                //save json structure of the network
-                std::ofstream out(in->out_struct_f);
+                //save json structure of the network both final and partial
+                std::ofstream out(s_path);
                 out << "{" << std::endl;
                 out << "\t" << "\"neurons\": [" << std::endl;
                 for(int l=1; l<this->neurons.size(); l++) {
@@ -768,8 +814,8 @@ class Network {
                             else {out << "\t\t\t\t" << "}" << std::endl;} 
                         }
                         out << "\t\t\t" << "]" << std::endl;
-                        if(l+1<this->neurons.size() && n+1<this->neurons[l].size()) {out << "\t\t" << "}," << std::endl;}
-                        else {out << "\t\t" << "}" << std::endl;}
+                        if(l+1 == this->neurons.size() && n+1 == this->neurons[l].size()) {out << "\t\t" << "}" << std::endl;}
+                        else {out << "\t\t" << "}," << std::endl;}
                     }
                 }
                 out << "\t" << "]," << std::endl;
@@ -796,32 +842,7 @@ class Network {
             }
 
             //save results of the network, both partial and complete
-            //they are partials if and only if the max(current bit) != max(bit limit)
-            std::string path;
-            int curr_max = *std::max_element(this->current_bits.begin(), this->current_bits.end());
-            if(*std::max_element(this->bit_limits.begin(), this->bit_limits.end()) == curr_max) {
-                path = in->out_results_f;
-            } else {
-                //find the folder where the file should be saved and create the partial path depending on the current bit
-                std::stringstream folder(in->out_results_f);
-                //control is used to ignore the last component of the path (a.k.a the file name)
-                //therefore it is kept one component ahead
-                std::stringstream control(in->out_results_f);
-                std::string buff;
-                std::getline(control, buff, '/');
-                while(std::getline(control, buff, '/')) {
-                    std::getline(folder, buff, '/');
-                    //insert the component extracted from the original path in the desired one
-                    path += buff;
-                    path += "/";
-                }
-                //insert the partial output filename
-                path += "partial_outputs_";
-                path += std::to_string(curr_max); 
-                path += ".exa";
-            }
-            //actual outputs printing on the correct file
-            std::ofstream r_out(path);
+            std::ofstream r_out(r_path);
             r_out << "n_inp " << ex_set->examples[0].input.size() << std::endl;
             r_out << "n_out " << ex_set->examples[0].label.size() << std::endl;
             r_out << "n_patt " << ex_set->examples.size() << std::endl;
@@ -888,8 +909,8 @@ class Network {
             int l=1;
             //data["neurons"] is a vector containing every neuron's info need to scan all of it
             //only the neurons from the first hidden layer onwards are saved
+            std::vector<Neuron> layer;
             for(auto neuron=data["neurons"].begin(); neuron!=data["neurons"].end(); neuron++) {
-                std::vector<Neuron> layer;
                 //the neuron's position is saved as [layer, neuron] --> layer starts from 1 as the input layer is not saved
                 //need to check if the layer has changed 
                 if(l!=(*neuron)["pos"][0]) {
@@ -933,6 +954,7 @@ class Network {
                 }
                 layer.push_back(n);   
             }
+            this->neurons.push_back(layer);
         }
 };
 

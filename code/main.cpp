@@ -97,7 +97,7 @@ void printUpdate(Network* net, int iteration, int time, float error, bool tele_u
 }
 //error function for the network's output evaluation
 //res is the input of the eval function of a network
-//currently a MSE function is used
+//currently a RMS function is used
 float error(vector<vector<float>>* res, ExampleSet* ex_set) {
     float err=0;
     for(int j=0; j<ex_set->examples.size(); j++) { //example j
@@ -108,6 +108,7 @@ float error(vector<vector<float>>* res, ExampleSet* ex_set) {
         err+=distance;
     }
     err/=ex_set->examples.size();
+    err=sqrt(err);
     return err;
 }
 //training funciton of the model
