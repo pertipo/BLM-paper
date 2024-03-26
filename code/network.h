@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <random>
 #include <nlohmann/json.hpp>
 
 //TODO handle public fragments of classes
@@ -12,6 +13,10 @@
 //Thresholds used to simplify calculations in the logistic function
 #define NEGATIVE_TRESHOLD -10000.
 #define POSITIVE_TRESHOLD 10000.
+
+//global random number generator
+//it will be initialized with a seed in the network initialization phase
+std::mt19937 rng;
 
 //Transfer function implemented and selectable
 //same transfer is used ofr the input layer (as its data need to be unchanged) and as a default in case of errors
@@ -340,19 +345,27 @@ class Weight {
         void init(Init* in, int layer) {
             //calculate the constant value based on weight range and maximum number of discretization bits
             this->constant = (in->w_range) / (pow(2, ((in->d_bits[layer]) -1)) -1);
-            srand(in->r_seed);
+            
+            //initialize the normal distribution for the ini_dens check
+            std::uniform_int_distribution<> ini_dens_dist(1,100);
             //generate the value for the discrete part of the weight
             //statistically generate a "ini_dens" number of nonzero values
-            if((std::rand() % 100 + 1) <= ((in->ini_dens)*100)) { 
+            if(ini_dens_dist(rng) <= ((in->ini_dens)*100)) {
                 //randomly generate the initial value of the discrete value
                 if(in->full_rand_ini) {
                     //in full random mode the only constraint is the max number of bits in the representation
-                    this->discrete = std::rand() % (2*(int)pow(2,(in->d_bits[layer]-1))) - pow(2,(in->d_bits[layer]-1));
+                    int min = -pow(2,(in->d_bits[layer]-1));
+                    int max = -min -1;
+                    std::uniform_int_distribution<> full_rand_dist(min, max);
+                    this->discrete = full_rand_dist(rng);
                 } else { 
                     //in non full random mode the constraint becomes the w_ini parameter 
                     //w_ini is a limit of the actual weight, so also the constant must be taken into account
-                    this->discrete = std::rand() % (2*(int)ceil((in->w_ini)/(this->constant))) - ceil((in->w_ini)/(this->constant));
-                }   
+                    int min = -ceil((in->w_ini)/(this->constant));
+                    int max = -min;
+                    std::uniform_int_distribution<> ini_w_dist(min, max);
+                    this->discrete = ini_w_dist(rng);
+                }
             } else {
                 //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
                 this->discrete = 0;
@@ -554,8 +567,8 @@ class Network {
         void init(Init* in, ExampleSet* ex_set) {
             //need to initialize network == neuron structure + general parameters + input data  
             
-            //start random number generator with given seed 
-            srand(in->r_seed);
+            //initialize global random number generator with given seed 
+            rng = std::mt19937(in->r_seed);
 
             //general parameters initialization
             //the weight range is simply present in the init instance

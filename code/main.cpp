@@ -1,6 +1,4 @@
-#include <set>
 #include "network.h"
-#include <random>
 
 //constant used to decide how often the reports of the training are printed == it's a percentage
 #define REPORT_EACH_UPDATE_PERCENTAGE 10
@@ -114,9 +112,7 @@ float error(vector<vector<float>>* res, ExampleSet* ex_set) {
 //training funciton of the model
 //it is based on the network structure in the apposite library
 float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-thread and keep_dens
-    srand(time(0));
-    random_device rd;
-    mt19937 g(rd()); 
+    mt19937 rng(in->r_seed);
     //need a vector of not-used positions in order to avoid repeating the same study multiple times
     //it will be reset each time an improving position is found
     vector<vector<int>> positions;
@@ -266,7 +262,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             //look for first improving move
             
             //generate a random position == shuffle the vector of all positions and extract the first
-            shuffle(positions.begin(), positions.end(), g);
+            shuffle(positions.begin(), positions.end(), rng);
             int r_layer = positions[0][0];
             int r_neuron = positions[0][1];
             int r_weight = positions[0][2];
