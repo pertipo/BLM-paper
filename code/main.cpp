@@ -94,7 +94,7 @@ void printUpdate(Network* net, int iteration, int time, float error, bool tele_u
     cout << endl;
 }
 //error function for the network's output evaluation
-//res is the input of the eval function of a network
+//res is the output of the eval function of a network
 //currently a RMS function is used
 float error(vector<vector<float>>* res, ExampleSet* ex_set) {
     float err=0;

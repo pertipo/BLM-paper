@@ -374,10 +374,32 @@ class Weight {
         //function to return the actual value of the weight used in the calculations
         float value() {return discrete * constant;}
         //function to flip a specific bit of the discretization value (in gray code)
-        void bitFlip(unsigned bit) {
+        //limit is needed to keep track of negative numbers and sign change == is the bit limit for the representation
+        void bitFlip(unsigned bit, unsigned limit) {
             //NB: you save number in normal binary, but you want to do a bit flip in gray code
             //So the idea is to get to the correct number in gray code 
             //(e.g. flipping the third bit from 2 you need to get to 5 == from 0011 to 0111 in gray, while you start with 0010 and need to get to 0101)
+            
+            //need to handle negative gray code
+            //the idea is to make the negative number positive, perform the normal bitflip and change the sign once again
+            
+            //need to handle the bitflip on the last representable bit == sign bit (as it  depends on the maximum bit representation the system is using)
+            //just flip the number's sign
+
+            //the representation of negative numbers in gray code obtained by this logic is specular to the positive one, with only the sign bit differentiating a positive and negative number
+            //for example 2 will be represented as 0011, while -2 will be represented as 1011 (if the maximum bit number is 4)
+            //this means that 0 is represented twice, but it should be fine
+
+            if(bit+1 == limit) {
+                this->discrete = -this->discrete;
+                return;
+            }
+            if(this->discrete < 0) {
+                int tmp = -this->discrete;
+                tmp = tmp ^ ((1 << bit+1)-1);
+                this->discrete = -tmp;
+                return;
+            }
             this->discrete = this->discrete ^ ((1 << bit+1)-1);
         }
 };
@@ -628,6 +650,10 @@ class Network {
                         w.init(in, layer);
                         n.weights_and_inputs.push_back({w, &(*previous_n)});
                     }
+                    //insert the weight not associated with any neuron == parameter
+                    Weight par;
+                    par.init(in, layer);
+                    n.weights_and_inputs.push_back({par, NULL});
                     hidden_l.push_back(n);
                 }
                 this->neurons.push_back(hidden_l);
@@ -657,6 +683,10 @@ class Network {
                     w.init(in, (in->n_h_l));
                     n.weights_and_inputs.push_back({w, &(*previous_n)});
                 }
+                //insert the weight not associated with any neuron == parameter
+                Weight par;
+                par.init(in, in->n_h_l);
+                n.weights_and_inputs.push_back({par, NULL});
                 output_l.push_back(n);
             }
             this->neurons.push_back(output_l);
@@ -739,7 +769,7 @@ class Network {
             //save the unchanged value of the required weight
             Weight previous = std::get<0>(this->neurons[position[0]][position[1]].weights_and_inputs[position[2]]);
             //change the required weight
-            std::get<0>(this->neurons[position[0]][position[1]].weights_and_inputs[position[2]]).bitFlip(bit);
+            std::get<0>(this->neurons[position[0]][position[1]].weights_and_inputs[position[2]]).bitFlip(bit, this->bit_limits[position[0]-1]);
             //extract the changed value of the weight
             Weight current = std::get<0>(this->neurons[position[0]][position[1]].weights_and_inputs[position[2]]);
             //return the floating difference in between the original value and the modified one
@@ -965,6 +995,11 @@ class Network {
                     n.weights_and_inputs.push_back({w, &(*previous_n)});
                     i++;
                 }
+                //insert the last weight == the parameter == unrelated to any previous neuron
+                Weight par;
+                par.constant=(*neuron)["weights"][i]["constant"];
+                par.discrete=(*neuron)["weights"][i]["discrete"];
+                n.weights_and_inputs.push_back({par, NULL});
                 layer.push_back(n);   
             }
             this->neurons.push_back(layer);
