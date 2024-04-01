@@ -75,6 +75,22 @@ class TelescopicStep {
     }
 };
 
+//function to reset a suitable positions vector for training
+vector<vector<int>> trainingPositions(Network* net) {
+    vector<vector<int>> positions;
+    //an available position is a possible bitflip over a weight's discrete value in a neuron
+    //number of possible positions == SUM over each layer (number of neuorns in the layer * number of weights per neuron in the layer * number of usable bits in the layer)
+    for(int l=0; l<net->neurons.size(); l++) {
+        for(int n=0; n<net->neurons[l+1].size(); n++) {
+            for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
+                for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
+                    positions.push_back({l+1,n,w,b});
+                }
+            }
+        }
+    }
+    return positions;
+}
 //function to print updates of the training
 //two kinds of updates are possible --> decided by the tele_update parameter
 //1. if an improving move has been found
@@ -115,18 +131,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
     mt19937 rng(in->r_seed);
     //need a vector of not-used positions in order to avoid repeating the same study multiple times
     //it will be reset each time an improving position is found
-    vector<vector<int>> positions;
-    //insert each available position in the list
-    for(int l=0; l<in->n_h_l; l++) {
-        for(int n=0; n<net->neurons[l+1].size(); n++) {
-            for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
-                for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
-                    positions.push_back({l+1,n,w,b});
-                }
-            }
-        }
-    }
-    
+    vector<vector<int>> positions = trainingPositions(net);
     //position of the best weight change formatted as [layer,neuron,weight,bit]
     //used only in the d_all mode
     vector<int> best_position;
@@ -287,16 +292,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                     printUpdate(net, iterations, clock(), best_err, false);
                 }
                 //reset positions
-                positions.clear();
-                for(int l=0; l<in->n_h_l; l++) {
-                    for(int n=0; n<net->neurons[l+1].size(); n++) {
-                        for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
-                            for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
-                                positions.push_back({l+1,n,w,b});
-                            }
-                        }
-                    }
-                }
+                positions = trainingPositions(net);
                 //reset stepper without giving the network == don't need to update the threshold
                 stepper.reset(NULL);
             } else { //modification was a failure
@@ -321,16 +317,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                         }
                     }
                     //reset positions
-                    positions.clear();
-                    for(int l=0; l<in->n_h_l; l++) {
-                        for(int n=0; n<net->neurons[l+1].size(); n++) {
-                            for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
-                                for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
-                                    positions.push_back({l+1,n,w,b});
-                                }
-                            }
-                        }
-                    }
+                    positions = trainingPositions(net);
                     //reset stepper completely == give network
                     stepper.reset(net);
                     //print update
