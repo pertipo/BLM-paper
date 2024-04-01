@@ -58,7 +58,7 @@ class TelescopicStep {
         if(net != NULL) {
             int moves = 0;
             for(int l=1; l<net->neurons.size(); l++) {
-                moves += net->neurons[l].size() * net->neurons[l-1].size() * net->current_bits[l-1];
+                moves += net->neurons[l].size() * net->neurons[l][0].weights_and_inputs.size() * net->current_bits[l-1];
             }
             this->moves=moves;
             this->computeThreshold();

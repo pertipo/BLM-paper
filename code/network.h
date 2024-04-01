@@ -343,9 +343,13 @@ class Weight {
 
         //initialization function based on the layer position
         void init(Init* in, int layer) {
-            //calculate the constant value based on weight range and maximum number of discretization bits
-            this->constant = (in->w_range) / (pow(2, ((in->d_bits[layer]) -1)) -1);
-            
+            int max_repr_with_dbits = pow(2, (in->d_bits[layer] -1)) -1;
+            //calculate the constant range value based on weight range and maximum number of discretization bits
+            float c_max = (in->w_range) / max_repr_with_dbits;
+
+            std::uniform_real_distribution<> const_dist(0, c_max);
+            this->constant = const_dist(rng);
+
             //initialize the normal distribution for the ini_dens check
             std::uniform_int_distribution<> ini_dens_dist(1,100);
             //generate the value for the discrete part of the weight
@@ -354,15 +358,17 @@ class Weight {
                 //randomly generate the initial value of the discrete value
                 if(in->full_rand_ini) {
                     //in full random mode the only constraint is the max number of bits in the representation
-                    int min = -pow(2,(in->d_bits[layer]-1));
-                    int max = -min -1;
+                    int min = -max_repr_with_dbits;
+                    int max = max_repr_with_dbits;
                     std::uniform_int_distribution<> full_rand_dist(min, max);
                     this->discrete = full_rand_dist(rng);
                 } else { 
                     //in non full random mode the constraint becomes the w_ini parameter 
                     //w_ini is a limit of the actual weight, so also the constant must be taken into account
-                    int min = -ceil((in->w_ini)/(this->constant));
-                    int max = -min;
+                    //also the maximmum number of discretization bits must be taken into account
+                    int large_range = ceil((in->w_ini)/(this->constant));
+                    int max = (large_range < max_repr_with_dbits)? large_range : max_repr_with_dbits;
+                    int min = -max;
                     std::uniform_int_distribution<> ini_w_dist(min, max);
                     this->discrete = ini_w_dist(rng);
                 }
