@@ -542,7 +542,7 @@ class Neuron {
             this->outputs.tmp_partials.clear();
             //resize float vector to match the number of examples (previous layer number of outputs). Assuming previous layer already calculated
             //this should also set each tmp_partial to 0 at the start of computation
-            this->outputs.tmp_partials.resize(std::get<1>(*weights_and_inputs.begin())->outputs.best_partials.size()); 
+            this->outputs.tmp_partials.resize(std::get<1>(*(weights_and_inputs.begin()))->outputs.best_partials.size(), 0.0); 
 
             //compute the dot product between weights and previous neuron's otuputs
             //to do so, for each previous neuron, add to the partial value the multiplication between the weight and the output
@@ -784,12 +784,13 @@ class Network {
         //function that updates the best partial outputs of each neuron starting from a given position
         void updateOutput(int* position) {
             //position just needs [layer,neuron]
+            int layer = position[0];
             //set the new output as permanent for the modified neruon 
-            this->neurons[position[0]][position[1]].outputs.best_partials=this->neurons[position[0]][position[1]].outputs.tmp_partials;
+            this->neurons[layer][position[1]].outputs.best_partials=this->neurons[layer][position[1]].outputs.tmp_partials;
 
             //set the new outputs as permanent for each neuron in each successive layer
-            while(++position[0]<this->neurons.size()) {
-                for(auto n=this->neurons[position[0]].begin(); n!=this->neurons[position[0]].end(); n++) {
+            while(++layer<this->neurons.size()) {
+                for(auto n=this->neurons[layer].begin(); n!=this->neurons[layer].end(); n++) {
                     (*n).outputs.best_partials=(*n).outputs.tmp_partials;
                 }
             }

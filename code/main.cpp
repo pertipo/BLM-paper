@@ -80,7 +80,7 @@ vector<vector<int>> trainingPositions(Network* net) {
     vector<vector<int>> positions;
     //an available position is a possible bitflip over a weight's discrete value in a neuron
     //number of possible positions == SUM over each layer (number of neuorns in the layer * number of weights per neuron in the layer * number of usable bits in the layer)
-    for(int l=0; l<net->neurons.size(); l++) {
+    for(int l=0; l<net->neurons.size()-1; l++) {
         for(int n=0; n<net->neurons[l+1].size(); n++) {
             for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
                 for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
@@ -268,12 +268,12 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             
             //generate a random position == shuffle the vector of all positions and extract the first
             shuffle(positions.begin(), positions.end(), rng);
-            int r_layer = positions[0][0];
-            int r_neuron = positions[0][1];
-            int r_weight = positions[0][2];
-            int r_bit = positions[0][3];
+            int r_layer = positions.back()[0];
+            int r_neuron = positions.back()[1];
+            int r_weight = positions.back()[2];
+            int r_bit = positions.back()[3];
             //remove position as it was tested
-            positions.erase(positions.begin());
+            positions.erase(positions.end()-1);
 
             //change that bit + evaluate and see the new error
             int pos[3] = {r_layer,r_neuron,r_weight};
