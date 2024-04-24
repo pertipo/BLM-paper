@@ -10,10 +10,6 @@
 
 //TODO handle public fragments of classes
 
-//Thresholds used to simplify calculations in the logistic function
-#define NEGATIVE_TRESHOLD -10000.
-#define POSITIVE_TRESHOLD 10000.
-
 //global random number generator
 //it will be initialized with a seed in the network initialization phase
 std::mt19937 rng;
@@ -23,11 +19,7 @@ std::mt19937 rng;
 float same(float in) {return in;}
 //logistic transfer is approximated to, 0 or 1, without the actual computations of a logistic function if the input is outside the boundaries of the defined thresholds
 //this can be applied as the output of a logistic function tends to 1 (0) if the input becomes really big (small).
-float logistic(float in) {
-    if(in > POSITIVE_TRESHOLD) {return 1;}
-    if(in < NEGATIVE_TRESHOLD) {return 0;}
-    return (1 / (1 + exp(-in)));
-}
+float logistic(float in) {return (1 / (1 + exp(-in)));}
 float hyperTan(float in) {return std::tanh(in);}
 float arctangent(float in) {return std::atan(in);}
 
@@ -344,38 +336,69 @@ class Weight {
         //initialization function based on the layer position
         void init(Init* in, int layer) {
             int max_repr_with_dbits = pow(2, (in->d_bits[layer] -1)) -1;
-            //calculate the constant range value based on weight range and maximum number of discretization bits
+            //calculate the constant value based on weight range and maximum number of discretization bits
             float c_max = (in->w_range) / max_repr_with_dbits;
 
-            std::uniform_real_distribution<> const_dist(0, c_max);
-            this->constant = const_dist(rng);
+            this->constant = c_max;
 
             //initialize the normal distribution for the ini_dens check
-            std::uniform_int_distribution<> ini_dens_dist(1,100);
+            std::uniform_int_distribution<> random_percentage(1,100);
             //generate the value for the discrete part of the weight
             //statistically generate a "ini_dens" number of nonzero values
-            if(ini_dens_dist(rng) <= ((in->ini_dens)*100)) {
+            if(random_percentage(rng) <= ((in->ini_dens)*100)) {
                 //randomly generate the initial value of the discrete value
-                if(in->full_rand_ini) {
-                    //in full random mode the only constraint is the max number of bits in the representation
-                    int min = -max_repr_with_dbits;
-                    int max = max_repr_with_dbits;
-                    std::uniform_int_distribution<> full_rand_dist(min, max);
-                    this->discrete = full_rand_dist(rng);
-                } else { 
-                    //in non full random mode the constraint becomes the w_ini parameter 
-                    //w_ini is a limit of the actual weight, so also the constant must be taken into account
-                    //also the maximmum number of discretization bits must be taken into account
-                    int large_range = ceil((in->w_ini)/(this->constant));
-                    int max = (large_range < max_repr_with_dbits)? large_range : max_repr_with_dbits;
-                    int min = -max;
-                    std::uniform_int_distribution<> ini_w_dist(min, max);
-                    this->discrete = ini_w_dist(rng);
+                if(in->telescopic) {
+                    //if the telescopic mode is requested the discrete weights will be initialized randomly but with a logic
+                    //only the n most significant bits may be set to 1
+                    //where n is the number of starting bits
+                    
+                    //ignore the least significant bits and perform a successive l_shift (also ignore the sign bit)
+                    int max = pow(2, in->ini_bits-1) -1;
+                    std::uniform_int_distribution<> abs_significant(1, max);
+                    int abs_value = abs_significant(rng) << (in->d_bits[layer] - in->ini_bits);
+                    
+                    //consider the bit sign (as it is the most significant one it's always considered)
+                    //randomly determine the sign of the weight with equal probability
+                    this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+                } else {
+                    if(in->full_rand_ini) {
+                        //in full random mode the only constraint is the max number of bits in the representation
+                        int max = max_repr_with_dbits;
+                        std::uniform_int_distribution<> full_rand_dist(1, max);
+                        int abs_value = full_rand_dist(rng);
+                        this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+                    } else { 
+                        //in non full random mode the constraint becomes the w_ini parameter 
+                        //w_ini is a limit of the actual weight, so also the constant must be taken into account
+                        //also the maximmum number of discretization bits must be taken into account
+                        int large_range = ceil((in->w_ini)/(this->constant));
+                        int max = (large_range < max_repr_with_dbits)? large_range : max_repr_with_dbits;
+                        std::uniform_int_distribution<> ini_w_dist(1, max);
+                        int abs_value = ini_w_dist(rng);
+                        this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+                    }
                 }
             } else {
                 //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
                 this->discrete = 0;
             }
+            
+            /* OLD RNG SYSTEM
+            if((std::rand() % 100 + 1) <= ((in->ini_dens)*100)) { 
+                //randomly generate the initial value of the discrete value
+                if(in->full_rand_ini) {
+                    //in full random mode the only constraint is the max number of bits in the representation
+                    this->discrete = std::rand() % (2*(int)pow(2,(in->d_bits[layer]-1))) - pow(2,(in->d_bits[layer]-1));
+                } else { 
+                    //in non full random mode the constraint becomes the w_ini parameter 
+                    //w_ini is a limit of the actual weight, so also the constant must be taken into account
+                    this->discrete = std::rand() % (2*(int)ceil((in->w_ini)/(this->constant))) - ceil((in->w_ini)/(this->constant));
+                }   
+            } else {
+                //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
+                this->discrete = 0;
+            }
+            */
         }
         //function to return the actual value of the weight used in the calculations
         float value() {return discrete * constant;}
@@ -397,13 +420,7 @@ class Weight {
             //this means that 0 is represented twice, but it should be fine
 
             if(bit+1 == limit) {
-                this->discrete = -this->discrete;
-                return;
-            }
-            if(this->discrete < 0) {
-                int tmp = -this->discrete;
-                tmp = tmp ^ ((1 << bit+1)-1);
-                this->discrete = -tmp;
+                this->discrete = ~this->discrete;
                 return;
             }
             this->discrete = this->discrete ^ ((1 << bit+1)-1);
@@ -526,7 +543,7 @@ class ExampleSet {
 class Neuron {
     public:
         //vector contaning every weight of the neuron and its associated previous neuron (in the form of a reference) --> input layer will have an empty vector
-        //in the last element of the vector is the parameter --> it will have NULL as a previous neuron
+        //in the last element of the vector is the parameter --> it will have nullptr as a previous neuron
         std::vector<std::tuple<Weight, Neuron *>> weights_and_inputs; 
         //outputs of the neuron
         Output outputs;
@@ -551,8 +568,8 @@ class Neuron {
                 Weight w = std::get<0>(*w_i);
                 Neuron* previous = std::get<1>(*w_i);
 
-                if(previous == NULL) { 
-                    //if previous equals NULL the weight is the parameter --> just need to add it to the outputs
+                if(previous == nullptr) { 
+                    //if previous equals nullptr the weight is the parameter --> just need to add it to the outputs
                     //need to add the parameter to each possible output (i.e. one for each sample)
                     for(auto single_o=this->outputs.tmp_partials.begin(); single_o!=this->outputs.tmp_partials.end(); single_o++) {
                         *single_o += w.value();
@@ -596,7 +613,7 @@ class Network {
             //need to initialize network == neuron structure + general parameters + input data  
             
             //initialize global random number generator with given seed 
-            rng = std::mt19937(in->r_seed);
+            rng.seed(in->r_seed);
 
             //general parameters initialization
             //the weight range is simply present in the init instance
@@ -659,7 +676,7 @@ class Network {
                     //insert the weight not associated with any neuron == parameter
                     Weight par;
                     par.init(in, layer);
-                    n.weights_and_inputs.push_back({par, NULL});
+                    n.weights_and_inputs.push_back({par, nullptr});
                     hidden_l.push_back(n);
                 }
                 this->neurons.push_back(hidden_l);
@@ -692,19 +709,19 @@ class Network {
                 //insert the weight not associated with any neuron == parameter
                 Weight par;
                 par.init(in, in->n_h_l);
-                n.weights_and_inputs.push_back({par, NULL});
+                n.weights_and_inputs.push_back({par, nullptr});
                 output_l.push_back(n);
             }
             this->neurons.push_back(output_l);
         }
         //compute the result of the current configuration of the network for each input sample
         //it is possible to insert a strating position (usefull to reduce number of computation in training phase when a weight is changed)
-        //if NULL is passed as position the entirety of the computation will be made
+        //if nullptr is passed as position the entirety of the computation will be made
         //change in weight is the difference in value of the new weight (it's used in the partial update mode)
         std::vector<std::vector<float>> eval(int* start_position, float change_in_weight) {
             //position is formatted as: [layer, neuron, weight], or empty
             //The function should: verify if a starting position exists (otherwise compute all); compute result; return the output layer's Output vector
-            if(start_position == NULL) {
+            if(start_position == nullptr) {
                 //compute all neurons' outputs in order from first hidden layer to output (using the apposite function of the neuron class)
                 for(auto layer=this->neurons.begin(); layer!=this->neurons.end(); layer++) { 
                     for(auto neur=(*layer).begin(); neur!=(*layer).end(); neur++) {
@@ -716,13 +733,22 @@ class Network {
 
                 //update the output of the neuron with a changed weight
                 int start_l=start_position[0], start_n=start_position[1], start_w=start_position[2];
-                //extract the inputs of the neuron in the starting position associated with the changed weight
-                //those are the best outputs (ignore the partials in order to avoid residual computations from other attempts)
-                std::vector<float> inputs = std::get<1>(this->neurons[start_l][start_n].weights_and_inputs[start_w])->outputs.values(true);
-                //compute the tmp_partial outputs of the starting neuron starting from the best ones and adding the difference in weight multiplied by the inputs obtained before
-                //intuitively only the change in weight is different from the best partials (which were calculated before), so using the inputs the change in the outputs is easily calculated
-                for(int i=0; i<inputs.size(); i++) {
-                    this->neurons[start_l][start_n].outputs.tmp_partials[i] = this->neurons[start_l][start_n].outputs.best_partials[i] + (change_in_weight*inputs[i]);
+                //verify that the changed weight isn't the parameter
+                Neuron* input_n = std::get<1>(this->neurons[start_l][start_n].weights_and_inputs[start_w]);
+                if(input_n == nullptr) {
+                    //difference in parameter must be add to each output
+                    for(int i=0; i<this->neurons[start_l][start_n].outputs.tmp_partials.size(); i++) {
+                        this->neurons[start_l][start_n].outputs.tmp_partials[i] = this->neurons[start_l][start_n].outputs.best_partials[i] + (change_in_weight);
+                    }
+                } else {
+                    //extract the inputs of the neuron in the starting position associated with the changed weight
+                    //those are the best outputs (ignore the partials in order to avoid residual computations from other attempts)
+                    std::vector<float> inputs = input_n->outputs.values(true);
+                    //compute the tmp_partial outputs of the starting neuron starting from the best ones and adding the difference in weight multiplied by the inputs obtained before
+                    //intuitively only the change in weight is different from the best partials (which were calculated before), so using the inputs the change in the outputs is easily calculated
+                    for(int i=0; i<this->neurons[start_l][start_n].outputs.tmp_partials.size(); i++) {
+                        this->neurons[start_l][start_n].outputs.tmp_partials[i] = this->neurons[start_l][start_n].outputs.best_partials[i] + (change_in_weight*inputs[i]);
+                    }
                 }
 
                 //update the layer successive to the one with the changed weight 
@@ -741,7 +767,7 @@ class Network {
                         float w = std::get<0>((*neur).weights_and_inputs[start_n]).value();
                         //compute the tmp_partial outputs with the same logic as the starting neuron's
                         for(int i=0; i<new_outputs.size(); i++) {
-                            (*neur).outputs.tmp_partials[i]+=(w*(new_outputs[i]-previous_outputs[i]));
+                            (*neur).outputs.tmp_partials[i] = (*neur).outputs.best_partials[i] + (w*(new_outputs[i]-previous_outputs[i]));
                         }
                     }
 
@@ -752,6 +778,12 @@ class Network {
                         for(auto neur=this->neurons[successive_l].begin(); neur!=neurons[successive_l].end(); neur++) {
                             (*neur).calculate();
                         }
+                    }
+                } else {
+                    //if a weight in the last layer has been modified I need to make sure that the correct outputs are extracted in the next layer
+                    for(int out_n=0; out_n<this->neurons.back().size(); out_n++) {
+                        if(out_n == start_n) {continue;}
+                        this->neurons.back()[out_n].outputs.tmp_partials = this->neurons.back()[out_n].outputs.best_partials;
                     }
                 }
             }
@@ -784,10 +816,10 @@ class Network {
         //function that updates the best partial outputs of each neuron starting from a given position
         void updateOutput(int* position) {
             //position just needs [layer,neuron]
-            int layer = position[0];
             //set the new output as permanent for the modified neruon 
-            this->neurons[layer][position[1]].outputs.best_partials=this->neurons[layer][position[1]].outputs.tmp_partials;
+            this->neurons[position[0]][position[1]].outputs.best_partials=this->neurons[position[0]][position[1]].outputs.tmp_partials;
 
+            int layer = position[0];
             //set the new outputs as permanent for each neuron in each successive layer
             while(++layer<this->neurons.size()) {
                 for(auto n=this->neurons[layer].begin(); n!=this->neurons[layer].end(); n++) {
@@ -912,6 +944,9 @@ class Network {
         }
         //function that extracts info from a network structure json file and initializes network to match the requirements
         void loadFromFile(Init* in, ExampleSet* ex_set) {
+            //initialize global random number generator with given seed 
+            rng.seed(in->r_seed);
+
             using json = nlohmann::json;
 
             //need to load json file structure and extract data
@@ -1006,7 +1041,7 @@ class Network {
                 Weight par;
                 par.constant=(*neuron)["weights"][i]["constant"];
                 par.discrete=(*neuron)["weights"][i]["discrete"];
-                n.weights_and_inputs.push_back({par, NULL});
+                n.weights_and_inputs.push_back({par, nullptr});
                 layer.push_back(n);   
             }
             this->neurons.push_back(layer);

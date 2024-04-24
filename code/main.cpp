@@ -1,13 +1,13 @@
 #include "network.h"
 
 //constant used to decide how often the reports of the training are printed == it's a percentage
-#define REPORT_EACH_UPDATE_PERCENTAGE 10
+#define REPORT_EACH_UPDATE_PERCENTAGE 1
 
 //constants used in the telescopic step calculation
 //decay factor in the average update
 #define DECAY_FACTOR 0.3
 //fraction of possible moves that conceptually are considered containing an improving move
-#define MOVES_FRACTION 0.7
+#define MOVES_FRACTION 1
 
 using namespace std;
 
@@ -30,16 +30,14 @@ class TelescopicStep {
     //it is based on the possible moves and the apposite parameters
     void computeThreshold() {
         float k=floor(this->moves*this->moves_fraction);
-        vector<float> a;
-        a.push_back(0);
-        for(int n=0; n<this->moves-k; n++) {
-            a.push_back((a[n] + (k/(n+k)))*((n+1)/(n+k+1)));
-        }
-
-        this->threshold=0;
-        for(int n=1; n<=this->moves-k; n++) {
-            this->threshold= a[n]+(((n+k+k)/(n+k))*this->threshold);
-        }
+        //TESTING FACTOR
+        // this->threshold=0;
+        // float a=0;
+        // for(int N=k+1; N<this->moves; N++) {
+        //     a = ((float)(N-k)/N) * (k/(N-1) + a);
+        //     this->threshold = a + ((float)(N-k)/N)*this->threshold;
+        // }
+        this->threshold = k;
     }
 
     public: 
@@ -57,7 +55,7 @@ class TelescopicStep {
         this->avg=0;
         if(net != NULL) {
             int moves = 0;
-            for(int l=1; l<net->neurons.size(); l++) {
+            for(int l=1; l<net->neurons.size(); l++) { 
                 moves += net->neurons[l].size() * net->neurons[l][0].weights_and_inputs.size() * net->current_bits[l-1];
             }
             this->moves=moves;
@@ -70,24 +68,35 @@ class TelescopicStep {
     //the number of moves tested is authomatically saved in the stepper --> increased every time this function is called
     bool needBitIncrease() {
         this->iteration++;
-        this->avg = (this->avg)*(this->decay_fact) + (1-this->decay_fact)*(this->iteration);
-        return (this->avg > this->threshold);
+        // TESTING FACTOR
+        // this->avg = (this->avg)*(this->decay_fact) + (1-this->decay_fact)*(this->iteration);
+        this->avg = this->iteration;
+        return (this->avg >= this->threshold);
     }
 };
 
 //function to reset a suitable positions vector for training
-vector<vector<int>> trainingPositions(Network* net) {
+vector<vector<int>> trainingPositions(Network* net, Init* in) {
     vector<vector<int>> positions;
+    vector<vector<int>> zeros;
     //an available position is a possible bitflip over a weight's discrete value in a neuron
     //number of possible positions == SUM over each layer (number of neuorns in the layer * number of weights per neuron in the layer * number of usable bits in the layer)
     for(int l=0; l<net->neurons.size()-1; l++) {
         for(int n=0; n<net->neurons[l+1].size(); n++) {
             for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
                 for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
-                    positions.push_back({l+1,n,w,b});
+                    if(in->keep_dens && get<0>(net->neurons[l+1][n].weights_and_inputs[w]).discrete == 0) {
+                        zeros.push_back({l+1,n,w,b});
+                    } else {
+                        positions.push_back({l+1,n,w,b});
+                    }
                 }
             }
         }
+    }
+    shuffle(positions.begin(), positions.end(), rng);
+    if(!zeros.empty()) {
+        positions.insert(positions.begin(), zeros.begin(), zeros.end());
     }
     return positions;
 }
@@ -111,8 +120,8 @@ void printUpdate(Network* net, int iteration, int time, float error, bool tele_u
 }
 //error function for the network's output evaluation
 //res is the output of the eval function of a network
-//currently a RMS function is used
 float error(vector<vector<float>>* res, ExampleSet* ex_set) {
+    //RMS error 
     float err=0;
     for(int j=0; j<ex_set->examples.size(); j++) { //example j
         float distance=0;
@@ -121,17 +130,18 @@ float error(vector<vector<float>>* res, ExampleSet* ex_set) {
         }
         err+=distance;
     }
-    err/=ex_set->examples.size();
+    err=err/ex_set->examples.size();
     err=sqrt(err);
     return err;
 }
 //training funciton of the model
 //it is based on the network structure in the apposite library
-float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-thread and keep_dens
-    mt19937 rng(in->r_seed);
+float train(Network* net, Init* in, ExampleSet* ex_set) { 
+    //TODO handle multi-thread
+    
     //need a vector of not-used positions in order to avoid repeating the same study multiple times
     //it will be reset each time an improving position is found
-    vector<vector<int>> positions = trainingPositions(net);
+    vector<vector<int>> positions = trainingPositions(net, in);
     //position of the best weight change formatted as [layer,neuron,weight,bit]
     //used only in the d_all mode
     vector<int> best_position;
@@ -141,7 +151,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
     int iterations = 0;
     //initial best error found evaluating the network after an initialization
     vector<vector<float>> out = net->eval(NULL,0);
-    float best_err = error(&out, ex_set);
+    float best_err = error(&(out), ex_set);
     //initiate the stepper using the constants declared
     //used only in the not-d_all mode
     TelescopicStep stepper = TelescopicStep(DECAY_FACTOR, MOVES_FRACTION, net);
@@ -152,7 +162,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
     //1. max number of iteration
     //2. max time has passed
     //3. no improving move found with maximum number of bits
-    while(((in->max_iter == -1) || (iterations < in->max_iter)) && ((in->time == -1) || (clock() < in->time))) {
+    while(((in->max_iter == -1) || (iterations < in->max_iter)) && ((in->time == -1) || (clock() < in->time*1000))) {
         iterations++;
         //two possible modes
         //1. look for the best improving move --> need to check all possible moves and find the best one
@@ -266,8 +276,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
         } else {
             //look for first improving move
             
-            //generate a random position == shuffle the vector of all positions and extract the first
-            shuffle(positions.begin(), positions.end(), rng);
+            //generate a random position
+            //the vector of all positions is shuffled in generation == just extract the last position
             int r_layer = positions.back()[0];
             int r_neuron = positions.back()[1];
             int r_weight = positions.back()[2];
@@ -284,6 +294,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
             if(err < best_err) { //improving step found
                 //update best_error
                 best_err=err;
+                //recompute every output to erase any possible residues from previous moves
+                //net->eval(NULL, 0);
                 //make network change permanent
                 net->updateOutput(pos);
                 //print the update info (not allways, only a certain percantage)
@@ -292,7 +304,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                     printUpdate(net, iterations, clock(), best_err, false);
                 }
                 //reset positions
-                positions = trainingPositions(net);
+                positions = trainingPositions(net, in);
                 //reset stepper without giving the network == don't need to update the threshold
                 stepper.reset(NULL);
             } else { //modification was a failure
@@ -317,7 +329,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) { //TODO handle multi-th
                         }
                     }
                     //reset positions
-                    positions = trainingPositions(net);
+                    positions = trainingPositions(net, in);
                     //reset stepper completely == give network
                     stepper.reset(net);
                     //print update
@@ -336,7 +348,8 @@ int main(int argc, char* argv[]) {
     //the program needs a command file path in the argv parameters
     //it is used to extract all the parammeters and functionalities
     //use the command file to initialize the Init instance
-    Init in = Init(argv[1]);
+    string path = argv[2];
+    Init in = Init(path);
     //from the Init instance initialize the ExampleSet instance 
     ExampleSet ex_set = ExampleSet(&in);
     Network net;
