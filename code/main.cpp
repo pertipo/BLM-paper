@@ -8,9 +8,13 @@
 #define DECAY_FACTOR 0.3
 //fraction of possible moves that conceptually are considered containing an improving move
 #define MOVES_FRACTION 1
+//number of improvements before evaluation in training
+#define EVAL_AFTER_STEPS 1000
 
 using namespace std;
 
+
+//TODO fix stepper
 //class used to calculate when the bit limit must be updated (for the first improving telescopic mode)
 class TelescopicStep {
     //iterations before the first improving move
@@ -75,28 +79,61 @@ class TelescopicStep {
     }
 };
 
+/* OLD RNG SYSTEM */
+int zero_positions = 0;
 //function to reset a suitable positions vector for training
 vector<vector<int>> trainingPositions(Network* net, Init* in) {
+    /* NEW RNG SYSTEM */
+    // vector<vector<int>> positions;
+    // vector<vector<int>> zeros;
+    // //an available position is a possible bitflip over a weight's discrete value in a neuron
+    // //number of possible positions == SUM over each layer (number of neuorns in the layer * number of weights per neuron in the layer * number of usable bits in the layer)
+    // for(int l=0; l<net->neurons.size()-1; l++) {
+    //     for(int n=0; n<net->neurons[l+1].size(); n++) {
+    //         for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
+    //             for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
+    //                 if(in->keep_dens && get<0>(net->neurons[l+1][n].weights_and_inputs[w]).discrete == 0) {
+    //                     zeros.push_back({l+1,n,w,b});
+    //                 } else {
+    //                     positions.push_back({l+1,n,w,b});
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // shuffle(positions.begin(), positions.end(), rng);
+    // shuffle(zeros.begin(), zeros.end(), rng);
+    // if(!zeros.empty()) {
+    //     positions.insert(positions.begin(), zeros.begin(), zeros.end());
+    // }
+    // return positions;
+
+    /* OLD RNG SYSTEM */
     vector<vector<int>> positions;
-    vector<vector<int>> zeros;
-    //an available position is a possible bitflip over a weight's discrete value in a neuron
-    //number of possible positions == SUM over each layer (number of neuorns in the layer * number of weights per neuron in the layer * number of usable bits in the layer)
     for(int l=0; l<net->neurons.size()-1; l++) {
         for(int n=0; n<net->neurons[l+1].size(); n++) {
             for(int w=0; w<net->neurons[l+1][n].weights_and_inputs.size(); w++) {
                 for(int b=(net->bit_limits[l] - net->current_bits[l]); b<net->bit_limits[l]; b++) {
-                    if(in->keep_dens && get<0>(net->neurons[l+1][n].weights_and_inputs[w]).discrete == 0) {
-                        zeros.push_back({l+1,n,w,b});
-                    } else {
-                        positions.push_back({l+1,n,w,b});
-                    }
+                    positions.push_back({l+1,n,w,b});
                 }
             }
         }
     }
-    shuffle(positions.begin(), positions.end(), rng);
-    if(!zeros.empty()) {
-        positions.insert(positions.begin(), zeros.begin(), zeros.end());
+
+    if(in->keep_dens) {
+        int i = 0, j = positions.size() -1;
+        while (i < j) {
+            if (!get<0>(net->neurons[positions[i][0]][positions[i][1]].weights_and_inputs[positions[i][2]]).discrete)
+                i++;
+            else if (get<0>(net->neurons[positions[j][0]][positions[j][1]].weights_and_inputs[positions[j][2]]).discrete)
+                j--;
+            else {
+                iter_swap(positions.begin()+i, positions.begin()+j);
+                i++;
+                j--;
+            }
+        }
+        zero_positions = j + 1;
     }
     return positions;
 }
@@ -111,8 +148,8 @@ void printUpdate(Network* net, int iteration, int time, float error, bool tele_u
     }
     //inform of the current situation of the training phase
     //iteration reached + time passed + best error reached + bit analyzed at each layer
-    cout << "Iteration: " << iteration << "\ttime: " << time << "ms" << endl;
-    cout << "\tError: " << error << "\tCurrent bits: ";
+    cout << "Iteration: " << iteration << "\ttime: " << time/1000 << "s" << endl;
+    cout << "\tError: " << sqrt((error)/net->neurons[0][0].outputs.best_partials.size()) << "\tCurrent bits: ";
     for(auto bit=net->current_bits.begin(); bit!=net->current_bits.end(); bit++) {
         cout << (*bit) << "  ";
     }
@@ -120,25 +157,48 @@ void printUpdate(Network* net, int iteration, int time, float error, bool tele_u
 }
 //error function for the network's output evaluation
 //res is the output of the eval function of a network
+float max_error = 1;
 float error(vector<vector<float>>* res, ExampleSet* ex_set) {
-    //RMS error 
+    /* RMS AS DEFINED */
+    // //RMS error 
+    // float err=0;
+    // for(int j=0; j<ex_set->examples.size(); j++) { //example j
+    //     float distance=0;
+    //     for(int i=0; i<res->size(); i++) { //channel i
+    //         distance+=pow((ex_set->examples[j].label[i] - (*res)[i][j]),2);
+    //     }
+    //     err+=distance;
+    // }
+    // err/=ex_set->examples.size();
+    // // err/=max_error;
+    // // err=sqrt(err);
+    // return err;
+
+    /* RMS AS IMPLEMENTED */
     float err=0;
+    unsigned long long nt=0;
+    float errs[32];
     for(int j=0; j<ex_set->examples.size(); j++) { //example j
         float distance=0;
         for(int i=0; i<res->size(); i++) { //channel i
             distance+=pow((ex_set->examples[j].label[i] - (*res)[i][j]),2);
         }
-        err+=distance;
+        int pi = 0;
+        for (unsigned long long pp=1; nt & pp; pp <<= 1, pi++)
+            distance += errs[pi];
+        errs[pi] = distance;
+        nt++;
     }
-    err=err/ex_set->examples.size();
-    err=sqrt(err);
-    return err;
+    for (unsigned long long nnt = nt, pi = 0; nnt; nnt >>= 1, pi++ ) {
+        if (nnt & 1) {
+            err += errs[pi];
+        }
+    }
+    return err;  
 }
 //training funciton of the model
 //it is based on the network structure in the apposite library
-float train(Network* net, Init* in, ExampleSet* ex_set) { 
-    //TODO handle multi-thread
-    
+float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) { 
     //need a vector of not-used positions in order to avoid repeating the same study multiple times
     //it will be reset each time an improving position is found
     vector<vector<int>> positions = trainingPositions(net, in);
@@ -151,13 +211,57 @@ float train(Network* net, Init* in, ExampleSet* ex_set) {
     int iterations = 0;
     //initial best error found evaluating the network after an initialization
     vector<vector<float>> out = net->eval(NULL,0);
+    // max_error = error(&(out), ex_set);
     float best_err = error(&(out), ex_set);
     //initiate the stepper using the constants declared
     //used only in the not-d_all mode
     TelescopicStep stepper = TelescopicStep(DECAY_FACTOR, MOVES_FRACTION, net);
     //counter used to determine how often to print updates
     int update_counter=0;
-    
+    //counter used to determine how often to evaluate
+    int eval_counter=0;
+    //log file to save each error evolution
+    ofstream log;
+    //log file to save training evaluation results
+    ofstream test_log;
+    //log file to save training positions
+    ofstream moves_log;
+
+    //prepare log files to put each iteration and testing result 
+    string log_f;
+    string test_log_f;
+    //prepare log file to put every chosen move
+    string moves_log_f;
+    //find the folder where the results file should be saved and create the partial path depending on the current bit
+    stringstream log_folder(in->out_results_f);
+    //control is used to ignore the last component of the path (a.k.a the file name)
+    //therefore it is kept one component ahead
+    stringstream log_control(in->out_results_f);
+    string tmp_buff;
+    std::getline(log_control, tmp_buff, '/');
+    while(std::getline(log_control, tmp_buff, '/')) {
+        std::getline(log_folder, tmp_buff, '/');
+        //insert the component extracted from the original path in the desired one
+        log_f += tmp_buff;
+        test_log_f += tmp_buff;
+        moves_log_f += tmp_buff;
+        log_f += "/";
+        test_log_f += "/";
+        moves_log_f += "/";
+    }
+    //insert the log filename
+    log_f += "log.txt";
+    test_log_f += "test_log.txt";
+    moves_log_f += "moves_log.txt";
+    log = ofstream(log_f);
+    log << "Training sequence" << endl << "Iteration\tError" << endl;
+    moves_log = ofstream(moves_log_f);
+    moves_log << "Training sequence" << endl << "Move[l,n,w,b]" << endl;
+    if(test_set!=nullptr) {
+        test_log = ofstream(test_log_f);
+        test_log << "Generalization sequence" << endl << "Evaluation completed every: " << EVAL_AFTER_STEPS << " improvements" << endl << "Iteration\tError" << endl;
+    }
+
     //training phase that has 3 possible limits (the most restrictive is chosen)
     //1. max number of iteration
     //2. max time has passed
@@ -167,6 +271,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set) {
         //two possible modes
         //1. look for the best improving move --> need to check all possible moves and find the best one
         //2. look for the first improving move --> test random the positions untill the stepper tells it's enough or an improving move is found
+        //TODO update d_all case
         if(in->d_all) {
             //look for best improving move
 
@@ -276,22 +381,43 @@ float train(Network* net, Init* in, ExampleSet* ex_set) {
         } else {
             //look for first improving move
             
-            //generate a random position
-            //the vector of all positions is shuffled in generation == just extract the last position
-            int r_layer = positions.back()[0];
-            int r_neuron = positions.back()[1];
-            int r_weight = positions.back()[2];
-            int r_bit = positions.back()[3];
-            //remove position as it was tested
+            /* NEW RNG SYSTEM */
+            // //generate a random position
+            // //the vector of all positions is shuffled in generation == just extract the last position
+            // int r_layer = positions.back()[0];
+            // int r_neuron = positions.back()[1];
+            // int r_weight = positions.back()[2];
+            // int r_bit = positions.back()[3];
+            // //remove position as it was tested
+            // positions.erase(positions.end()-1);
+
+            /* OLD RNG SYSTEM */
+            int pos_i = (zero_positions < positions.size())? zero_positions + rand() % (positions.size()-zero_positions) : rand() % positions.size();
+            int r_layer = positions[pos_i][0];
+            int r_neuron = positions[pos_i][1];
+            int r_weight = positions[pos_i][2];
+            int r_bit = positions[pos_i][3];
+            iter_swap(positions.begin() + pos_i, positions.end()-1);
             positions.erase(positions.end()-1);
 
             //change that bit + evaluate and see the new error
             int pos[3] = {r_layer,r_neuron,r_weight};
             out = net->eval(pos, net->change(pos, r_bit));
             float err = error(&out, ex_set);
+            
 
             //confront & update error
-            if(err < best_err) { //improving step found
+            if((err) < best_err) { //improving step found
+                //register new finding on logs
+                log << iterations << "\t" << err << endl;
+                //log the chosen move
+                int r_w_number = 0;
+                for(int l=1; l<r_layer; l++) {
+                    r_w_number += net->neurons[l].size() * net->neurons[l][0].weights_and_inputs.size();
+                }
+                r_w_number += r_neuron * net->neurons[r_layer][0].weights_and_inputs.size();
+                r_w_number += r_weight;
+                moves_log << "[" << r_w_number << ","<< r_bit << "]" << endl;
                 //update best_error
                 best_err=err;
                 //recompute every output to erase any possible residues from previous moves
@@ -307,11 +433,26 @@ float train(Network* net, Init* in, ExampleSet* ex_set) {
                 positions = trainingPositions(net, in);
                 //reset stepper without giving the network == don't need to update the threshold
                 stepper.reset(NULL);
+
+                //if needed evaluate the training so far
+                if(test_set!=nullptr && ++eval_counter>=EVAL_AFTER_STEPS) {
+                    eval_counter = 0;
+                    //substitute inputs with the testing set
+                    net->switchInputs(test_set);
+                    //calculate error
+                    vector<vector<float>> out = net->eval(nullptr,0);
+                    float test_err = error(&out, test_set);
+                    //log error
+                    test_log << iterations << "\t" << test_err << endl;
+                    //restore inputs to the originals
+                    net->switchInputs(ex_set);
+                    net->eval(nullptr, 0);
+                }
             } else { //modification was a failure
                 //reset change in weight
                 net->change(pos, r_bit);
                 //make a step and check result
-                if(stepper.needBitIncrease()) { //telescopic threshold reached
+                if(positions.empty()/*stepper.needBitIncrease()*/) { //telescopic threshold reached
                     //save results obtained so far
                     cout << "Saving partial results..." << endl;
                     net->saveToFile(in, ex_set);
@@ -348,10 +489,12 @@ int main(int argc, char* argv[]) {
     //the program needs a command file path in the argv parameters
     //it is used to extract all the parammeters and functionalities
     //use the command file to initialize the Init instance
-    string path = argv[2];
+    string path = (argc < 2)? "../Test.cmd" : argv[2];
+    // string path = (argc < 2)? "../TestEval.cmd" : argv[2];
+    // string path = (argc < 2)? "../TestCPU.cmd" : argv[2];
     Init in = Init(path);
     //from the Init instance initialize the ExampleSet instance 
-    ExampleSet ex_set = ExampleSet(&in);
+    ExampleSet ex_set = ExampleSet(&in, false);
     Network net;
 
     //decide if the network structure must be initialized from scratch or loaded from a file
@@ -365,7 +508,12 @@ int main(int argc, char* argv[]) {
     //decide if the program should train or evaluate the network and perform the action required
     if(in.train) {
         cout << "Starting training..." << endl;
-        err = train(&net, &in, &ex_set);
+        if(!in.in_train_test_f.empty()) {
+            ExampleSet test_set = ExampleSet(&in, true);
+            err = train(&net, &in, &ex_set, &test_set);
+        } else {
+            err = train(&net, &in, &ex_set, nullptr);
+        }
         cout << "Training completed."; 
     } else {
         cout << "Starting evaluation..." << endl;

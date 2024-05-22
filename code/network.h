@@ -8,8 +8,6 @@
 #include <random>
 #include <nlohmann/json.hpp>
 
-//TODO handle public fragments of classes
-
 //global random number generator
 //it will be initialized with a seed in the network initialization phase
 std::mt19937 rng;
@@ -19,7 +17,7 @@ std::mt19937 rng;
 float same(float in) {return in;}
 //logistic transfer is approximated to, 0 or 1, without the actual computations of a logistic function if the input is outside the boundaries of the defined thresholds
 //this can be applied as the output of a logistic function tends to 1 (0) if the input becomes really big (small).
-float logistic(float in) {return (1 / (1 + exp(-in)));}
+float logistic(float in) {return (1.0 / (1.0 + exp(-in)));}
 float hyperTan(float in) {return std::tanh(in);}
 float arctangent(float in) {return std::atan(in);}
 
@@ -78,13 +76,14 @@ class Init {
         //input and output files paths
         std::string in_example_f;
         std::string in_struct_f;
+        std::string in_train_test_f;
         std::string out_results_f;
         std::string out_struct_f;
 
         //initialization function for the INit class that creates it from a command file
         Init(std::string path) {
             //open the command file and prepare to extract the usefull parameters
-            std::fstream in(path); //TODO check if file is readable and other controls on parameters
+            std::ifstream in(path); //TODO check if file is readable and other controls on parameters
             //map used to save all parameters present in the command file along with their value
             //a map is used as it allows to handle eventual repetitions or useless strings in the command file
             std::map<std::string, std::vector<float>> directives;
@@ -133,7 +132,8 @@ class Init {
                 }
                 //after the entire line is analyzed, if the directive wasn't saved in the files map, the directive-param tuple must be inserted in the directives map
                 if(!file) {directives.insert({directive, param});}
-            } 
+            }
+            in.close(); 
 
             //All lines of the command file have been analyzed
             //Now the init object's parameters must be set in accordance with the extracted directives
@@ -182,6 +182,9 @@ class Init {
                 exit(1);
             }
             this->in_example_f = current_file->second;            
+
+            current_file = files.find("in_train_test_f");
+            this->in_train_test_f = (current_file!=files.end())? current_file->second : ""; //if absent is left empty
 
             current_file = files.find("out_results_f");
             this->out_results_f = (current_file!=files.end())? current_file->second : "./out.exa"; //default path for results
@@ -324,7 +327,6 @@ class Output {
         }
 };
 
-//TODO handle ini_dens better
 //class used to contain the values of each weight
 class Weight {
     public:
@@ -341,50 +343,51 @@ class Weight {
 
             this->constant = c_max;
 
-            //initialize the normal distribution for the ini_dens check
-            std::uniform_int_distribution<> random_percentage(1,100);
-            //generate the value for the discrete part of the weight
-            //statistically generate a "ini_dens" number of nonzero values
-            if(random_percentage(rng) <= ((in->ini_dens)*100)) {
-                //randomly generate the initial value of the discrete value
-                if(in->telescopic) {
-                    //if the telescopic mode is requested the discrete weights will be initialized randomly but with a logic
-                    //only the n most significant bits may be set to 1
-                    //where n is the number of starting bits
+            // /* NEW RNG SYSTEM */
+            // //initialize the normal distribution for the ini_dens check
+            // std::uniform_int_distribution<> random_percentage(1,100);
+            // //generate the value for the discrete part of the weight
+            // //statistically generate a "ini_dens" number of nonzero values
+            // if(random_percentage(rng) <= ((in->ini_dens)*100)) {
+            //     //randomly generate the initial value of the discrete value
+            //     if(in->telescopic) {
+            //         //if the telescopic mode is requested the discrete weights will be initialized randomly but with a logic
+            //         //only the n most significant bits may be set to 1
+            //         //where n is the number of starting bits
                     
-                    //ignore the least significant bits and perform a successive l_shift (also ignore the sign bit)
-                    int max = pow(2, in->ini_bits-1) -1;
-                    std::uniform_int_distribution<> abs_significant(1, max);
-                    int abs_value = abs_significant(rng) << (in->d_bits[layer] - in->ini_bits);
+            //         //ignore the least significant bits and perform a successive l_shift (also ignore the sign bit)
+            //         int max = pow(2, in->ini_bits-1) -1;
+            //         std::uniform_int_distribution<> abs_significant(1, max);
+            //         int abs_value = abs_significant(rng) << (in->d_bits[layer] - in->ini_bits);
                     
-                    //consider the bit sign (as it is the most significant one it's always considered)
-                    //randomly determine the sign of the weight with equal probability
-                    this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
-                } else {
-                    if(in->full_rand_ini) {
-                        //in full random mode the only constraint is the max number of bits in the representation
-                        int max = max_repr_with_dbits;
-                        std::uniform_int_distribution<> full_rand_dist(1, max);
-                        int abs_value = full_rand_dist(rng);
-                        this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
-                    } else { 
-                        //in non full random mode the constraint becomes the w_ini parameter 
-                        //w_ini is a limit of the actual weight, so also the constant must be taken into account
-                        //also the maximmum number of discretization bits must be taken into account
-                        int large_range = ceil((in->w_ini)/(this->constant));
-                        int max = (large_range < max_repr_with_dbits)? large_range : max_repr_with_dbits;
-                        std::uniform_int_distribution<> ini_w_dist(1, max);
-                        int abs_value = ini_w_dist(rng);
-                        this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
-                    }
-                }
-            } else {
-                //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
-                this->discrete = 0;
-            }
+            //         //consider the bit sign (as it is the most significant one it's always considered)
+            //         //randomly determine the sign of the weight with equal probability
+            //         this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+            //     } else {
+            //         if(in->full_rand_ini) {
+            //             //in full random mode the only constraint is the max number of bits in the representation
+            //             int max = max_repr_with_dbits;
+            //             std::uniform_int_distribution<> full_rand_dist(1, max);
+            //             int abs_value = full_rand_dist(rng);
+            //             this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+            //         } else { 
+            //             //in non full random mode the constraint becomes the w_ini parameter 
+            //             //w_ini is a limit of the actual weight, so also the constant must be taken into account
+            //             //also the maximmum number of discretization bits must be taken into account
+            //             int large_range = ceil((in->w_ini)/(this->constant));
+            //             int max = (large_range < max_repr_with_dbits)? large_range : max_repr_with_dbits;
+            //             std::uniform_int_distribution<> ini_w_dist(1, max);
+            //             int abs_value = ini_w_dist(rng);
+            //             this->discrete = (random_percentage(rng) > 50)? abs_value : -abs_value;
+            //         }
+            //     }
+            // } else {
+            //     //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
+            //     this->discrete = 0;
+            // }
             
-            /* OLD RNG SYSTEM
-            if((std::rand() % 100 + 1) <= ((in->ini_dens)*100)) { 
+            /* OLD RNG SYSTEM */
+            if(in->ini_dens >= 1.0 || rand() / (float)RAND_MAX < in->ini_dens) { 
                 //randomly generate the initial value of the discrete value
                 if(in->full_rand_ini) {
                     //in full random mode the only constraint is the max number of bits in the representation
@@ -392,13 +395,12 @@ class Weight {
                 } else { 
                     //in non full random mode the constraint becomes the w_ini parameter 
                     //w_ini is a limit of the actual weight, so also the constant must be taken into account
-                    this->discrete = std::rand() % (2*(int)ceil((in->w_ini)/(this->constant))) - ceil((in->w_ini)/(this->constant));
+                    this->discrete = std::rand() % (2*(int)ceil((in->w_ini)/(this->constant)) +1) - ceil((in->w_ini)/(this->constant));
                 }   
             } else {
                 //set discretization value to 0 to obtain a zero weight (not permanent as the discrete value might change in training)
                 this->discrete = 0;
             }
-            */
         }
         //function to return the actual value of the weight used in the calculations
         float value() {return discrete * constant;}
@@ -441,9 +443,10 @@ class ExampleSet {
         std::vector<Example> examples;
 
         //initialization function based on the info contained in an Init instance
-        ExampleSet(Init* in) {
+        //the training_test parameter is to decide if the set will be taken from the examples or testing file
+        ExampleSet(Init* in, bool training_test) {
             //path of the file containing the example set
-            std::string ex_f = in->in_example_f;
+            std::string ex_f = (training_test)? in->in_train_test_f : in->in_example_f;
             //open the example file
             std::ifstream inp (ex_f);
             //temporary buffers used to store the components of each example
@@ -513,10 +516,11 @@ class ExampleSet {
                     } else {
                         first = false;
                     }
-                } //TODO handle tr_dens
+                }
                 //insert the dummy example into the example set
                 this->examples.push_back(ex);
             }
+            inp.close();
         }
         //function that converts to a vector of Output used in the initialization of the network to insert the samples in the first neuron layer
         std::vector<Output> toOutputs() {
@@ -613,7 +617,10 @@ class Network {
             //need to initialize network == neuron structure + general parameters + input data  
             
             //initialize global random number generator with given seed 
+            /* NEW RNG SYSTEM */
             rng.seed(in->r_seed);
+            /* OLD RNG SYSTEM */
+            std::srand(in->r_seed);
 
             //general parameters initialization
             //the weight range is simply present in the init instance
@@ -667,6 +674,9 @@ class Network {
                             n.outputs.transfer=&same;
                             break;
                     }
+                    //initialize parameter value first (even if it will we put last) in order to comply with the original implementation
+                    Weight par;
+                    par.init(in, layer);
                     //insert the connection to each previous layer's neuron and generate the associated weight 
                     for(auto previous_n = this->neurons[layer].begin(); previous_n!=this->neurons[layer].end(); previous_n++) {
                         Weight w;
@@ -674,8 +684,6 @@ class Network {
                         n.weights_and_inputs.push_back({w, &(*previous_n)});
                     }
                     //insert the weight not associated with any neuron == parameter
-                    Weight par;
-                    par.init(in, layer);
                     n.weights_and_inputs.push_back({par, nullptr});
                     hidden_l.push_back(n);
                 }
@@ -701,18 +709,31 @@ class Network {
                     default:
                         n.outputs.transfer=&same;
                 }
+                Weight par;
+                par.init(in, in->n_h_l);
                 for(auto previous_n = this->neurons[(in->n_h_l)].begin(); previous_n!=this->neurons[(in->n_h_l)].end(); previous_n++) {
                     Weight w;
                     w.init(in, (in->n_h_l));
                     n.weights_and_inputs.push_back({w, &(*previous_n)});
                 }
                 //insert the weight not associated with any neuron == parameter
-                Weight par;
-                par.init(in, in->n_h_l);
                 n.weights_and_inputs.push_back({par, nullptr});
                 output_l.push_back(n);
             }
             this->neurons.push_back(output_l);
+
+            /* TEST INITIALIZATION */
+            std::ofstream t_out("../TestResults/Init&MovesTest/W_init.txt");
+            t_out << "Initial discrete weights" << std::endl;
+            for(int l=1; l<this->neurons.size(); l++) {
+                for(int n=0; n<this->neurons[l].size(); n++) {
+                    t_out << std::get<0>(this->neurons[l][n].weights_and_inputs[this->neurons[l][n].weights_and_inputs.size()-1]).discrete << std::endl;
+                    for(int w=0; w<this->neurons[l][n].weights_and_inputs.size()-1; w++) {
+                        t_out << std::get<0>(this->neurons[l][n].weights_and_inputs[w]).discrete << std::endl;
+                    }
+                }
+            }
+            t_out.close();
         }
         //compute the result of the current configuration of the network for each input sample
         //it is possible to insert a strating position (usefull to reduce number of computation in training phase when a weight is changed)
@@ -827,6 +848,13 @@ class Network {
                 }
             }
         }
+        //function that switches the current inputs with the one given as parameter
+        void switchInputs(ExampleSet* ex_set) {
+            std::vector<Output> new_inputs = ex_set->toOutputs();
+            for(unsigned n=0; n<this->neurons[0].size(); n++) {
+                this->neurons[0][n].outputs = new_inputs[n];
+            }
+        }
         //function that saves the fundamental components of the network structure to the specified json file and the outputs of the network to the specified .exa file
         //layout of saved data is specified in the documentation
         void saveToFile(Init* in, ExampleSet* ex_set) {
@@ -921,6 +949,7 @@ class Network {
                 }
                 out << "]" << std::endl;
                 out << "}" << std::endl;
+                out.close();
             }
 
             //save results of the network, both partial and complete
@@ -941,6 +970,7 @@ class Network {
                 }
                 r_out << std::endl;
             }   
+            r_out.close();
         }
         //function that extracts info from a network structure json file and initializes network to match the requirements
         void loadFromFile(Init* in, ExampleSet* ex_set) {
@@ -1045,6 +1075,7 @@ class Network {
                 layer.push_back(n);   
             }
             this->neurons.push_back(layer);
+            f.close();
         }
 };
 
