@@ -9,7 +9,6 @@
 #include <string>
 #include <sstream>
 #include <random>
-#include <nlohmann/json.hpp>
 
 namespace net {
     //TODO handle public fragments of classes

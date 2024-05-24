@@ -129,10 +129,10 @@ Init::Init(std::string path) {
     current_file = files.find("out_struct_f");
     this->out_struct_f = (current_file != files.end()) ? current_file->second : "./net.json"; //default path for structure save
 
-    if (!this->load_structure) { //standard initiazlization == various compulsory parameters + some optional ones
-        current_dir = directives.find("r_seed");
-        this->r_seed = (current_dir != directives.end()) ? *current_dir->second.begin() : 1; //default is seed==1
+    current_dir = directives.find("r_seed");
+    this->r_seed = (current_dir != directives.end()) ? *current_dir->second.begin() : 1; //default is seed==1
 
+    if (!this->load_structure) { //standard initiazlization == various compulsory parameters + some optional ones
         current_dir = directives.find("n_neur"); //compulsory parameter == if absent throw error
         if (current_dir == directives.end()) {
             std::cerr << "ERROR" << std::endl << "Compulsory parameter \"n_neur\" omitted in command file: " << path << std::endl;
@@ -207,7 +207,6 @@ Init::Init(std::string path) {
 
         current_dir = directives.find("full_rand_ini"); //compulsory parameter == if absent throw error
         this->full_rand_ini = (current_dir != directives.end()) ? true : false;
-
     }
     else { //network initialization from file == some compulsory parameters (for the std init) are optional + one compulsory parameter needed
         current_file = files.find("in_struct_f"); //compulsory parameter == if absent throw error
@@ -612,20 +611,6 @@ void Network::init(Init* in, ExampleSet* ex_set) {
         output_l.push_back(n);
     }
     this->neurons.push_back(output_l);
-
-    /* TEST INITIALIZATION */
-    std::ofstream t_out("../TestResults/W_init.txt");
-    if(!t_out) {return;}
-    t_out << "Initial discrete weights" << std::endl;
-    for (int l = 1; l < this->neurons.size(); l++) {
-        for (int n = 0; n < this->neurons[l].size(); n++) {
-            t_out << std::get<0>(this->neurons[l][n].weights_and_inputs[this->neurons[l][n].weights_and_inputs.size() - 1]).discrete << std::endl;
-            for (int w = 0; w < this->neurons[l][n].weights_and_inputs.size() - 1; w++) {
-                t_out << std::get<0>(this->neurons[l][n].weights_and_inputs[w]).discrete << std::endl;
-            }
-        }
-    }
-    t_out.close();
 }
 //compute the result of the current configuration of the network for each input sample
 //it is possible to insert a strating position (usefull to reduce number of computation in training phase when a weight is changed)
@@ -873,43 +858,11 @@ void Network::loadFromFile(Init* in, ExampleSet* ex_set) {
     //initialize global random number generator with given seed 
     rng.seed(in->r_seed);
 
-    using json = nlohmann::json;
-
-    //need to load json file structure and extract data
-    std::ifstream f(in->in_struct_f);
-    json data = json::parse(f);
-
-    //general parameters extraction and setting
-
-    //if the init structure already contains specified values for the parameter those have the priority
-    //otherwise use the one specified in the json file
-    this->w_range = (in->w_range == 0) ? (float)data["w_range"] : in->w_range;
-    if (!in->d_bits.empty()) {
-        for (auto bit = in->d_bits.begin(); bit != in->d_bits.end(); bit++) {
-            this->bit_limits.push_back(*bit);
-        }
-    }
-    else {
-        for (auto bit = data["bit_limits"].begin(); bit != data["bit_limits"].end(); bit++) {
-            this->bit_limits.push_back(*bit);
-        }
-    }
-    if (in->ini_bits != -1) {
-        for (int i = 0; i < in->d_bits.size(); i++) {
-            this->current_bits.push_back(in->ini_bits);
-        }
-    }
-    else {
-        for (auto bit = data["current_bits"].begin(); bit != data["current_bits"].end(); bit++) {
-            this->current_bits.push_back(*bit);
-        }
-    }
-
-    //neuron structure initialization
+    using namespace std;
 
     //input layer creation with the same techinque as in the init function
-    std::vector<Output> channel_in = ex_set->toOutputs();
-    std::vector<Neuron> input_l;
+    vector<Output> channel_in = ex_set->toOutputs();
+    vector<Neuron> input_l;
     for (auto channel = channel_in.begin(); channel != channel_in.end(); channel++) {
         Neuron n;
         n.outputs = *channel;
@@ -917,63 +870,131 @@ void Network::loadFromFile(Init* in, ExampleSet* ex_set) {
     }
     this->neurons.push_back(input_l);
 
-    //extracting info from the the json structure for the hidden layers
-    //variable to keep track of the current layer while scrolling through every neuron position
-    int l = 1;
-    //data["neurons"] is a vector containing every neuron's info need to scan all of it
-    //only the neurons from the first hidden layer onwards are saved
-    std::vector<Neuron> layer;
-    for (auto neuron = data["neurons"].begin(); neuron != data["neurons"].end(); neuron++) {
-        //the neuron's position is saved as [layer, neuron] --> layer starts from 1 as the input layer is not saved
-        //need to check if the layer has changed 
-        if (l != (*neuron)["pos"][0]) {
-            //if the layer has changed insert the layer constructed so far in the neuron structure
-            this->neurons.push_back(layer);
-            //clear the temporary layer to restart for the next layer
-            layer.clear();
-            //set the new layer number in l
-            l = (*neuron)["pos"][0];
+    ifstream j_file(in->in_struct_f);
+    string buff, complete_line;
+    float constant = -1;
+    vector<Neuron> layer;
+    int previous_n = 0, current_l = 1;
+    while (getline(j_file, buff)) {
+        stringstream no_tabular(buff);
+        getline(no_tabular, complete_line, '\t');
+        while (complete_line == "") {
+            getline(no_tabular, complete_line, '\t');
         }
+        if (complete_line != "[" && complete_line != "{" && complete_line != "}" && complete_line != "}," && complete_line != "]" && complete_line != "]," && complete_line != "\"neurons\": [") {
+            stringstream no_name(complete_line);
+            string info;
+            getline(no_name, info, ':');
+            if (info == "\"pos\"") {
+                getline(no_name, info, ','); //only layer index and a [
+                if (stoi(info.substr(1)) != current_l) {
+                    current_l++;
+                    this->neurons.push_back(layer);
+                    layer.clear();
+                }
+                string neur_info;
+                Neuron n;
+                previous_n = 0;
+                getline(j_file, neur_info); //weights: [
+                getline(j_file, neur_info); //{
+                while (neur_info != "\t\t\t]") {
+                    Weight w;
+                    getline(j_file, neur_info); //index == useless
 
-        //create a neuron and insert it in the temporary layer
+                    getline(j_file, neur_info); //discrete
+                    stringstream tmp(neur_info);
+                    getline(tmp, neur_info, ','); //discrete minus the final ,
+                    string discr = neur_info.substr(16);
+                    w.discrete = stoi(discr);
 
-        //extract the transfer function numerical code for the current layer
-        int t = data["atransf"][l - 1];
-        Neuron n;
-        //set the correct transfer function of the neuron baased on the numerical code
-        switch (t) {
-        case 0:
-            n.outputs.transfer = &logistic;
-            break;
-        case 1:
-            n.outputs.transfer = &hyperTan;
-            break;
-        case 2:
-            n.outputs.transfer = &arctangent;
-            break;
-        default:
-            n.outputs.transfer = &same;
-            break;
+                    getline(j_file, neur_info); //constant
+                    if (constant == -1) {
+                        string c = neur_info.substr(16);
+                        constant = stof(c);
+                    }
+                    w.constant = constant;
+
+                    if(previous_n != this->neurons[current_l - 1].size()) {
+                        n.weights_and_inputs.push_back({ w, &(this->neurons[current_l - 1][previous_n]) });
+                        previous_n++;
+                    }
+
+                    getline(j_file, neur_info); //}
+                    getline(j_file, neur_info); //either next { or ]
+                }
+                layer.push_back(n);
+            }
+            else if (info == "\"bit_limits\"") {
+                this->neurons.push_back(layer);
+
+                if (in->d_bits.empty()) {
+                    getline(no_name, info, ']'); //" [l1, ..., ln"
+                    stringstream limits(info.substr(1)); //remove first space
+                    string limit;
+                    for (int i = 1; i < this->neurons.size(); i++) {
+                        getline(limits, limit, ','); //either "[l1" or " li"
+                        this->bit_limits.push_back(stoi(limit.substr(1)));
+                        in->d_bits.push_back(stoi(limit.substr(1)));
+                    }
+                }
+                else {
+                    this->bit_limits = in->d_bits;
+                }
+            }
+            else if (info == "\"current_bits\"") {
+                if (in->ini_bits == -1) {
+                    getline(no_name, info, ']'); //" [b1, ..., bn"
+                    stringstream c_bits(info.substr(1)); //remove first space
+                    string bits;
+                    for (int i = 1; i < this->neurons.size(); i++) {
+                        getline(c_bits, bits, ','); //either "[b1" or " bi"
+                        this->current_bits.push_back(stoi(bits.substr(1)));
+                    }
+                }
+                else {
+                    for (int i = 1; i < this->neurons.size(); i++) {
+                        this->current_bits.push_back(in->ini_bits);
+                    }
+                }
+            }
+            else if (info == "\"w_range\"") {
+                getline(no_name, info, ','); //" w_r"
+                w_range = (in->w_range == 0) ? stof(info.substr(1)) : in->w_range;
+            }
+            else if (info == "\"atransf\"") {
+                getline(no_name, info, ']'); //" [t1, ..., tn"
+                stringstream transfers(info.substr(1)); //remove first space
+                string transf;
+                in->atransf.resize(this->neurons.size() - 1);
+                for (int i = 1; i < this->neurons.size(); i++) {
+                    getline(transfers, transf, ','); //either "[t1" or " ti"
+                    float (*t)(float);
+                    switch (stoi(transf.substr(1))) {
+                    case 0:
+                        t = &logistic;
+                        in->atransf[i - 1] = Transfer::Logistic;
+                        break;
+                    case 1:
+                        t = &hyperTan;
+                        in->atransf[i - 1] = Transfer::HyperbolicTangent;
+                        break;
+                    case 2:
+                        t = &arctangent;
+                        in->atransf[i - 1] = Transfer::Arctangent;
+                        break;
+                    default:
+                        t = &same;
+                        in->atransf[i - 1] = Transfer::Same;
+                        break;
+                    }
+                    for (auto n = this->neurons[i].begin(); n != this->neurons[i].end(); n++) {
+                        (*n).outputs.transfer = t;
+                    }
+                }
+            }
         }
-
-        //insert the previous neurons connections and extract the weight values from the json structure
-        int i = 0;
-        for (auto previous_n = this->neurons[l - 1].begin(); previous_n != this->neurons[l - 1].end(); previous_n++) {
-            Weight w;
-            w.constant = (*neuron)["weights"][i]["constant"];
-            w.discrete = (*neuron)["weights"][i]["discrete"];
-            n.weights_and_inputs.push_back({ w, &(*previous_n) });
-            i++;
-        }
-        //insert the last weight == the parameter == unrelated to any previous neuron
-        Weight par;
-        par.constant = (*neuron)["weights"][i]["constant"];
-        par.discrete = (*neuron)["weights"][i]["discrete"];
-        n.weights_and_inputs.push_back({ par, nullptr });
-        layer.push_back(n);
     }
-    this->neurons.push_back(layer);
-    f.close();
+    j_file.close();
 }
 
 
