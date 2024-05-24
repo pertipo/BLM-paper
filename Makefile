@@ -1,6 +1,5 @@
 target:
-	sudo apt-get install nlohmann-json3-dev
-	g++ -o main main.cpp
+	g++ -o main code/main.cpp code/network.cpp
 
 clean:
 	rm main
