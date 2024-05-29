@@ -271,6 +271,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
     //3. no improving move found with maximum number of bits
     while (((in->max_iter == -1) || (iterations < in->max_iter)) && ((in->time == -1) || (clock() < in->time * 1000))) {
         iterations++;
+        
         //two possible modes
         //1. look for the best improving move --> need to check all possible moves and find the best one
         //2. look for the first improving move --> test random the positions untill the stepper tells it's enough or an improving move is found
