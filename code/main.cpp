@@ -553,6 +553,9 @@ int main(int argc, char* argv[]) {
     cout << "Saving completed." << endl << endl;
     cout << "Process completed." << endl;
 
+    cout << "\n\nPress enter to close this window" << endl;
+    while(cin.get()!='\n');
+
     return 0;
 }
 
