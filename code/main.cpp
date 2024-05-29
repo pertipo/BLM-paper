@@ -425,7 +425,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
             if ((err) < best_err) { //improving step found
                 improving_iterations++;
                 //register new finding on logs
-                log << improving_iterations << "\t" << err << endl;
+                log << improving_iterations << "\t" << sqrt(err/ex_set->examples.size()) << endl;
                 //log the chosen move
                 int r_w_number = 0;
                 for (int l = 1; l < r_layer; l++) {
@@ -459,7 +459,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                     vector<vector<float>> out = net->eval(nullptr, 0);
                     float test_err = error(&out, test_set);
                     //log error
-                    test_log << improving_iterations << "\t" << test_err << endl;
+                    test_log << improving_iterations << "\t" << sqrt(test_err/ex_set->examples.size()) << endl;
                     //restore inputs to the originals
                     net->switchInputs(ex_set);
                     net->eval(nullptr, 0);
