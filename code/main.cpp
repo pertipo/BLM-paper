@@ -501,9 +501,13 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
 
 int main(int argc, char* argv[]) {
     //the program needs a command file path in the argv parameters
+    if(argc < 2) {
+        cerr << "ERROR" << endl << "Missing command file"<< endl << "See usage in doc folder" << endl;
+        exit(1);
+    }
     //it is used to extract all the parammeters and functionalities
     //use the command file to initialize the Init instance
-    string path = (argc < 2) ? "./SpiralExample/ComandFiles/Train.cmd" : argv[2];
+    string path = argv[1];
     Init in = Init(path);
     //from the Init instance initialize the ExampleSet instance 
     ExampleSet ex_set = ExampleSet(&in, false);
