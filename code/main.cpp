@@ -502,9 +502,7 @@ int main(int argc, char* argv[]) {
     //the program needs a command file path in the argv parameters
     //it is used to extract all the parammeters and functionalities
     //use the command file to initialize the Init instance
-    string path = (argc < 2) ? "../Test.cmd" : argv[2];
-    // string path = (argc < 2)? "../TestEval.cmd" : argv[2];
-    // string path = (argc < 2)? "../TestCPU.cmd" : argv[2];
+    string path = (argc < 2) ? "./SpiralExample/ComandFiles/Train.cmd" : argv[2];
     Init in = Init(path);
     //from the Init instance initialize the ExampleSet instance 
     ExampleSet ex_set = ExampleSet(&in, false);

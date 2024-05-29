@@ -5,3 +5,9 @@ build/
 *.obj
 *.pdb
 *.zip
+*.aux
+*.log
+*.synctex
+*.toc
+*.out
+*.gz

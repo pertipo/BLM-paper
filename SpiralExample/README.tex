@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage{hyperref} 
+
+\title{Spiral Example Guide}
+\author{Gabriele Pernici}
+\date{May 2024}
+
+\begin{document}
+	
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+This document depicts how to use this example to reproduce the data regarding the spiral example. Bear in mind that a terminal capable of supporting the \textit{make} and \textit{g++} commands must be used, moreover this guide is written from a linux user's point of view.
+
+
+\section{Setup}
+The first thing to do is to download the GitHub repository and extracting it from its zipped state. After that, you must use the \textit{make} command from terminal, while being in the repository's first folder. This will produce the executable file named \textit{main} inside the same folder.
+
+\section{Training} \label{sec:train}
+In order to start the training the following command must be used, while being in the same folder:
+
+\begin{verbatim}
+	./main SpiralExample/ComandFiles/Train.cmd
+\end{verbatim}
+
+This will start the training algorithm and save every output in the \textit{Results} folder.
+
+\section{Results files}
+In the results folder there will be different files: 
+\begin{itemize}
+	\item 3 log files: \textit{log.txt} (with every iteration result), \textit{test\_log.txt} (with every test result that is performed every 1000 iterations) and \textit{moves\_log.txt} (with every move and decision taken).
+	
+	\item The struct files (all the \textit{.json}): they contain a loadable structure of the network after every bit increase in the training process. The \textit{struct.json} file contains the final structure.
+	
+	\item The results files (all the \textit{.exa}): they contain the actual result classification performed by the network on each input sample. The \textit{res.exa} file contains the final result.
+\end{itemize}
+
+\section{Evaluation} \label{sec:eval}
+After the training, in order to do the evaluation the following command must be used in the usual folder: 
+
+\begin{verbatim}
+	./main SpiralExample/ComandFiles/Eval.cmd
+\end{verbatim}
+
+This will produce the results used for the graphical representation of the classification. The results will be placed in the \textit{Results} folder as \textit{eval.exa}.
+
+\section{Python scripts}
+There are 4 python scripts in the repository (inside the \textit{PythonScripts} folder). What each of them is used for the following:
+
+\begin{itemize}
+	\item \textit{GenerateSamplesForImage.py} is used to generate the input file (\textit{Spiral\_evaluation.exa}) for the evaluation described in section \ref{sec:eval}.
+	
+	\item \textit{GenerateSamplesForTrain.py} is used to generate the input file (\textit{Spiral\_input.exa}) for the training described in section \ref{sec:train}.
+	
+	\item \textit{PlotNumericalResults.py} is used to analyze the progress of the training and its generalization (described in the \textit{log.txt} and \textit{test\_log.txt}).
+	
+	\item \textit{PlotSpiralImage.py} is used to plot the results of the evaluation process (described in section \ref{sec:eval}) and saves the image inside the \textit{Results} folder as \textit{eval.jpg}.
+\end{itemize}
+	
+\end{document}
