@@ -1,4 +1,5 @@
 #include "network.h"
+#include <iomanip>
 
 //constant used to decide how often the reports of the training are printed == it's a percentage
 #define REPORT_EACH_UPDATE_PERCENTAGE 1
@@ -141,18 +142,16 @@ vector<vector<int>> trainingPositions(Network* net, Init* in) {
 //two kinds of updates are possible --> decided by the tele_update parameter
 //1. if an improving move has been found
 //2. if the bit limit has been updated
-void printUpdate(Network* net, int iteration, int time, float error, bool tele_update) {
+void printUpdate(Network* net, int iteration, int improving_iteration, int time, float error, bool tele_update) {
     if (tele_update) {
         //inform of the updated bit limit
         cout << endl << "Increased number of bits considered." << endl;
     }
     //inform of the current situation of the training phase
     //iteration reached + time passed + best error reached + bit analyzed at each layer
-    cout << "Iteration: " << iteration << "\ttime: " << time / 1000 << "s" << endl;
-    cout << "\tError: " << 
-        //sqrt((error) / net->neurons[0][0].outputs.best_partials.size()) 
-        error
-        << "\tCurrent bits: ";
+    cout << "Iterations: " << iteration << "\t(Improving: " << improving_iteration << ")\ttime: " << time / 1000 << "s" << endl;
+    cout << "\tError: " << fixed << setprecision(6) << setfill('0') << sqrt((error) / net->neurons[0][0].outputs.best_partials.size()) 
+    << "\t\tCurrent bits: ";
     for (auto bit = net->current_bits.begin(); bit != net->current_bits.end(); bit++) {
         cout << (*bit) << "  ";
     }
@@ -212,6 +211,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
     vector<int> current_position;
     //iteration counter
     int iterations = 0;
+    //counter for iterations which provide an improvement
+    int improving_iterations = 0;
     //initial best error found evaluating the network after an initialization
     vector<vector<float>> out = net->eval(NULL, 0);
     // max_error = error(&(out), ex_set);
@@ -356,7 +357,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                                     //print the update info (not allways, only a certain percantage)
                                     if (++update_counter >= (100 / REPORT_EACH_UPDATE_PERCENTAGE)) {
                                         update_counter = 0;
-                                        printUpdate(net, iterations, clock(), best_err, false);
+                                        printUpdate(net, iterations, iterations, clock(), best_err, false);
                                     }
                                     //go to next iteration (without counting this one)
                                     iterations--;
@@ -420,8 +421,9 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
 
             //confront & update error
             if ((err) < best_err) { //improving step found
+                improving_iterations++;
                 //register new finding on logs
-                log << iterations << "\t" << err << endl;
+                log << improving_iterations << "\t" << err << endl;
                 //log the chosen move
                 int r_w_number = 0;
                 for (int l = 1; l < r_layer; l++) {
@@ -439,7 +441,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                 //print the update info (not allways, only a certain percantage)
                 if (++update_counter >= (100 / REPORT_EACH_UPDATE_PERCENTAGE)) {
                     update_counter = 0;
-                    printUpdate(net, iterations, clock(), best_err, false);
+                    printUpdate(net, iterations, improving_iterations, clock(), best_err, false);
                 }
                 //reset positions
                 positions = trainingPositions(net, in);
@@ -455,7 +457,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                     vector<vector<float>> out = net->eval(nullptr, 0);
                     float test_err = error(&out, test_set);
                     //log error
-                    test_log << iterations << "\t" << test_err << endl;
+                    test_log << improving_iterations << "\t" << test_err << endl;
                     //restore inputs to the originals
                     net->switchInputs(ex_set);
                     net->eval(nullptr, 0);
@@ -488,7 +490,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                     //reset stepper completely == give network
                     stepper.reset(net);
                     //print update
-                    printUpdate(net, iterations, clock(), best_err, true);
+                    printUpdate(net, iterations, improving_iterations, clock(), best_err, true);
                     update_counter = 0;
                 }
             }
@@ -540,7 +542,7 @@ int main(int argc, char* argv[]) {
         err = error(&out, &ex_set);
         cout << "Evaluation completed.";
     }
-    cout << "\tAverage error: " << err << endl;
+    cout << "\tAverage error: " << sqrt(err/ex_set.examples.size()) << endl;
 
     //save results and eventually the structure of the network
     cout << "Saving results in: " << in.out_results_f << endl;
