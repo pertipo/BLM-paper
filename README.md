@@ -10,9 +10,9 @@ To correctly start the program a ".cmd" file path must be prvided as parameter w
 The precise definition and structure of the ".cmd" file is described in the manual located in the doc folder.
 
 # EXAMPLES
-Here are reported general and incomplete examples, for more detailed ones see the folders named SomethingExample.
+Here are reported general and incomplete examples, for more detailed ones see the folders named _SomethingExample_.
 At the moment this repo contains: 
--SpiralExample = the double spiral recognition problem.
+* SpiralExample = the double spiral recognition problem.
 
 Example of a .cmd file to initialize a network, train it and save its structure
 ```
