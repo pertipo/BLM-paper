@@ -15,6 +15,7 @@ At the moment this repo contains:
 * SpiralExample = the double spiral recognition problem.
 
 Generic examples:
+
 Example of a .cmd file to initialize a network, train it and save its structure
 ```
 r_seed 3
