@@ -917,6 +917,8 @@ void Network::loadFromFile(Init* in, ExampleSet* ex_set) {
                     if(previous_n != this->neurons[current_l - 1].size()) {
                         n.weights_and_inputs.push_back({ w, &(this->neurons[current_l - 1][previous_n]) });
                         previous_n++;
+                    } else {
+                        n.weights_and_inputs.push_back({ w, nullptr });
                     }
 
                     getline(j_file, neur_info); //}
