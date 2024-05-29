@@ -2,7 +2,7 @@
 #include <iomanip>
 
 //constant used to decide how often the reports of the training are printed == it's a percentage
-#define REPORT_EACH_UPDATE_PERCENTAGE 1
+#define REPORT_EACH_UPDATE_PERCENTAGE 0.1
 
 //constants used in the telescopic step calculation
 //decay factor in the average update
@@ -265,6 +265,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
         test_log = ofstream(test_log_f);
         test_log << "Generalization sequence" << endl << "Evaluation completed every: " << EVAL_AFTER_STEPS << " improvements" << endl << "Iteration\tError" << endl;
     }
+
+    printUpdate(net, iterations, improving_iterations, clock(), best_err, false);
 
     //training phase that has 3 possible limits (the most restrictive is chosen)
     //1. max number of iteration
