@@ -36,7 +36,7 @@ plt.ylim(0, 0.6)
 plt.grid()
 plt.plot(xErr, yErr)
 plt.plot(xGen, yGen)
-# plt.savefig("../Results/Iterations.png")
+plt.savefig("../Results/iterations.jpg")
 plt.show()
 
 errF.close()

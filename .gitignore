@@ -11,3 +11,8 @@ build/
 *.toc
 *.out
 *.gz
+*.bbl
+*.bcf
+*.blg
+*.xml
+main

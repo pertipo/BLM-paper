@@ -1,9 +1,12 @@
 \documentclass{article}
 \usepackage{hyperref} 
+\usepackage{biblatex}
 
 \title{Spiral Example Guide}
 \author{Gabriele Pernici}
 \date{May 2024}
+
+\addbibresource{biblio.bib}
 
 \begin{document}
 	
@@ -12,8 +15,8 @@
 \tableofcontents
 
 \section{Introduction}
-This document depicts how to use this example to reproduce the data regarding the spiral example. Bear in mind that a terminal capable of supporting the \textit{make} and \textit{g++} commands must be used, moreover this guide is written from a linux user's point of view.
-
+This document depicts how to use this example to reproduce the data regarding the spiral example (described at \cite{Lang2018LearningTT}). Bear in mind that a terminal capable of supporting the \textit{make} and \textit{g++} commands must be used, moreover this guide is written from a linux user's point of view.
+The model was based on the paper from Roberto Battiti and Mauro Brunato \cite{7436772} implemented by Gabriele Pernici.
 
 \section{Setup}
 The first thing to do is to download the GitHub repository and extracting it from its zipped state. After that, you must use the \textit{make} command from terminal, while being in the repository's first folder. This will produce the executable file named \textit{main} inside the same folder.
@@ -22,7 +25,7 @@ The first thing to do is to download the GitHub repository and extracting it fro
 In order to start the training the following command must be used, while being in the same folder:
 
 \begin{verbatim}
-	./main SpiralExample/ComandFiles/Train.cmd
+	./main SpiralExample/CommandFiles/Train.cmd
 \end{verbatim}
 
 This will start the training algorithm and save every output in the \textit{Results} folder.
@@ -41,7 +44,7 @@ In the results folder there will be different files:
 After the training, in order to do the evaluation the following command must be used in the usual folder: 
 
 \begin{verbatim}
-	./main SpiralExample/ComandFiles/Eval.cmd
+	./main SpiralExample/CommandFiles/Eval.cmd
 \end{verbatim}
 
 This will produce the results used for the graphical representation of the classification. The results will be placed in the \textit{Results} folder as \textit{eval.exa}.
@@ -58,5 +61,8 @@ There are 4 python scripts in the repository (inside the \textit{PythonScripts} 
 	
 	\item \textit{PlotSpiralImage.py} is used to plot the results of the evaluation process (described in section \ref{sec:eval}) and saves the image inside the \textit{Results} folder as \textit{eval.jpg}.
 \end{itemize}
-	
+
+\clearpage
+\printbibliography
+
 \end{document}
