@@ -53,7 +53,7 @@ Init::Init(std::string path) {
                 first = false;
                 directive = buff;
             }
-            else {
+            else if(buff != "") {
                 //if the considered word is not the first it is either a file path or a numerical value associated with the directive
                 try {
                     //if the word is castable to a float it is obviously a value
