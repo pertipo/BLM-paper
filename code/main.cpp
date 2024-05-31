@@ -272,7 +272,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
     //1. max number of iteration
     //2. max time has passed
     //3. no improving move found with maximum number of bits
-    while (((in->max_iter == -1) || (iterations < in->max_iter)) && ((in->time == -1) || (clock() < in->time * 1000))) {
+    while (((in->max_iter == UINT_MAX) || (iterations < in->max_iter)) && ((in->time == UINT_MAX) || (clock() < in->time * 1000))) {
         iterations++;
         
         //two possible modes

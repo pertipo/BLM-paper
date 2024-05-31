@@ -87,13 +87,13 @@ Init::Init(std::string path) {
 
     //common parameters specifiable for init (both for load and init)
     current_dir = directives.find("ini_bits");
-    this->ini_bits = (current_dir != directives.end()) ? *current_dir->second.begin() : (unsigned)-1; //if UINT_MAX discretization starts at d_bits at each layer     
+    this->ini_bits = (current_dir != directives.end()) ? *current_dir->second.begin() : UINT_MAX; //if UINT_MAX discretization starts at d_bits at each layer     
 
     current_dir = directives.find("time");
-    this->time = (current_dir != directives.end()) ? *current_dir->second.begin() : (unsigned)-1; //if UINT_MAX there's no time limit
+    this->time = (current_dir != directives.end()) ? *current_dir->second.begin() : UINT_MAX; //if UINT_MAX there's no time limit
 
     current_dir = directives.find("max_iter");
-    this->max_iter = (current_dir != directives.end()) ? *current_dir->second.begin() : (unsigned)-1; //if UINT_MAX there's no iteration limit
+    this->max_iter = (current_dir != directives.end()) ? *current_dir->second.begin() : UINT_MAX; //if UINT_MAX there's no iteration limit
 
     current_dir = directives.find("tr_dens");
     this->tr_dens = (current_dir != directives.end()) ? *current_dir->second.begin() : 1; //default is all training samples used
@@ -518,7 +518,7 @@ void Network::init(Init* in, ExampleSet* ex_set) {
     //for each layer, the limits and initial bits for discretization must be set
     for (auto bits = in->d_bits.begin(); bits != in->d_bits.end(); bits++) {
         //set the initial bits as the bit limit for the layer or to the given value (if in telescopic mode and the value is specified)
-        int ini_bits = (!in->telescopic || in->ini_bits == (unsigned)-1) ? (*bits) : in->ini_bits;
+        int ini_bits = (!in->telescopic || in->ini_bits == UINT_MAX) ? (*bits) : in->ini_bits;
         //insert the bits parameters in the vectors
         this->current_bits.push_back(ini_bits);
         this->bit_limits.push_back(*bits);
@@ -944,7 +944,7 @@ void Network::loadFromFile(Init* in, ExampleSet* ex_set) {
                 }
             }
             else if (info == "\"current_bits\"") {
-                if (in->ini_bits == (unsigned)-1) {
+                if (in->ini_bits == UINT_MAX) {
                     getline(no_name, info, ']'); //" [b1, ..., bn"
                     stringstream c_bits(info.substr(1)); //remove first space
                     string bits;
