@@ -468,7 +468,7 @@ void Neuron::calculate() {
     this->outputs.tmp_partials.clear();
     //resize float vector to match the number of examples (previous layer number of outputs). Assuming previous layer already calculated
     //this should also set each tmp_partial to 0 at the start of computation
-    this->outputs.tmp_partials.resize(std::get<1>(*(weights_and_inputs.begin()))->outputs.best_partials.size(), 0.0);
+    this->outputs.tmp_partials.resize(std::get<1>(*(weights_and_inputs.end()-1))->outputs.best_partials.size(), 0.0);
 
     //compute the dot product between weights and previous neuron's otuputs
     //to do so, for each previous neuron, add to the partial value the multiplication between the weight and the output
@@ -567,14 +567,14 @@ void Network::init(Init* in, ExampleSet* ex_set) {
             //initialize parameter value first (even if it will we put last) in order to comply with the original implementation
             Weight par;
             par.init(in, layer);
+            //insert the weight not associated with any neuron == parameter
+            n.weights_and_inputs.push_back({ par, nullptr });
             //insert the connection to each previous layer's neuron and generate the associated weight 
             for (auto previous_n = this->neurons[layer].begin(); previous_n != this->neurons[layer].end(); previous_n++) {
                 Weight w;
                 w.init(in, layer);
                 n.weights_and_inputs.push_back({ w, &(*previous_n) });
             }
-            //insert the weight not associated with any neuron == parameter
-            n.weights_and_inputs.push_back({ par, nullptr });
             hidden_l.push_back(n);
         }
         this->neurons.push_back(hidden_l);
@@ -601,13 +601,13 @@ void Network::init(Init* in, ExampleSet* ex_set) {
         }
         Weight par;
         par.init(in, in->n_h_l);
+        //insert the weight not associated with any neuron == parameter
+        n.weights_and_inputs.push_back({ par, nullptr });
         for (auto previous_n = this->neurons[(in->n_h_l)].begin(); previous_n != this->neurons[(in->n_h_l)].end(); previous_n++) {
             Weight w;
             w.init(in, (in->n_h_l));
             n.weights_and_inputs.push_back({ w, &(*previous_n) });
         }
-        //insert the weight not associated with any neuron == parameter
-        n.weights_and_inputs.push_back({ par, nullptr });
         output_l.push_back(n);
     }
     this->neurons.push_back(output_l);
@@ -664,7 +664,7 @@ std::vector<std::vector<float>> Network::eval(int* start_position, float change_
             //for each neuron in the successive layer compute the chagne in the outputs
             for (auto neur = this->neurons[successive_l].begin(); neur != this->neurons[successive_l].end(); neur++) {
                 //extract the correct weight value == the one corresponding to the starting neuron
-                float w = std::get<0>((*neur).weights_and_inputs[start_n]).value();
+                float w = std::get<0>((*neur).weights_and_inputs[start_n+1]).value();
                 //compute the tmp_partial outputs with the same logic as the starting neuron's
                 for (int i = 0; i < new_outputs.size(); i++) {
                     (*neur).outputs.tmp_partials[i] = (*neur).outputs.best_partials[i] + (w * (new_outputs[i] - previous_outputs[i]));

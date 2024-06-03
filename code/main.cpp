@@ -83,7 +83,7 @@ public:
 /* OLD RNG SYSTEM */
 int zero_positions = 0;
 //function to reset a suitable positions vector for training
-vector<vector<int>> trainingPositions(Network* net, Init* in) {
+void trainingPositions(Network* net, Init* in, vector<vector<int>>* positions) {
     /* NEW RNG SYSTEM */
     // vector<vector<int>> positions;
     // vector<vector<int>> zeros;
@@ -110,33 +110,34 @@ vector<vector<int>> trainingPositions(Network* net, Init* in) {
     // return positions;
 
     /* OLD RNG SYSTEM */
-    vector<vector<int>> positions;
-    for (int l = 0; l < net->neurons.size() - 1; l++) {
-        for (int n = 0; n < net->neurons[l + 1].size(); n++) {
-            for (int w = 0; w < net->neurons[l + 1][n].weights_and_inputs.size(); w++) {
-                for (int b = (net->bit_limits[l] - net->current_bits[l]); b < net->bit_limits[l]; b++) {
-                    positions.push_back({ l + 1,n,w,b });
+    if(positions->empty()) {
+        for (int l = 0; l < net->neurons.size() - 1; l++) {
+            for (int n = 0; n < net->neurons[l + 1].size(); n++) {
+                for (int w = 0; w < net->neurons[l + 1][n].weights_and_inputs.size(); w++) {
+                    for (int b = (net->bit_limits[l] - net->current_bits[l]); b < net->bit_limits[l]; b++) {
+                        positions->push_back({ l + 1,n,w,b });
+                    }
                 }
             }
         }
     }
 
     if (in->keep_dens) {
-        int i = 0, j = positions.size() - 1;
+        int i = 0, j = positions->size() - 1;
         while (i < j) {
-            if (!get<0>(net->neurons[positions[i][0]][positions[i][1]].weights_and_inputs[positions[i][2]]).discrete)
+            if (!get<0>(net->neurons[(*positions)[i][0]][(*positions)[i][1]].weights_and_inputs[(*positions)[i][2]]).discrete)
                 i++;
-            else if (get<0>(net->neurons[positions[j][0]][positions[j][1]].weights_and_inputs[positions[j][2]]).discrete)
+            else if (get<0>(net->neurons[(*positions)[j][0]][(*positions)[j][1]].weights_and_inputs[(*positions)[j][2]]).discrete)
                 j--;
             else {
-                iter_swap(positions.begin() + i, positions.begin() + j);
+                iter_swap(positions->begin() + i, positions->begin() + j);
                 i++;
                 j--;
             }
         }
         zero_positions = j + 1;
     }
-    return positions;
+    return;
 }
 //function to print updates of the training
 //two kinds of updates are possible --> decided by the tele_update parameter
@@ -203,7 +204,10 @@ float error(vector<vector<float>>* res, ExampleSet* ex_set) {
 float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
     //need a vector of not-used positions in order to avoid repeating the same study multiple times
     //it will be reset each time an improving position is found
-    vector<vector<int>> positions = trainingPositions(net, in);
+    vector<vector<int>> positions; 
+    trainingPositions(net, in, &positions);
+    //number of still unchecked positions 
+    int tests = positions.size();
     //position of the best weight change formatted as [layer,neuron,weight,bit]
     //used only in the d_all mode
     vector<int> best_position;
@@ -407,13 +411,12 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
             // positions.erase(positions.end()-1);
 
             /* OLD RNG SYSTEM */
-            int pos_i = (zero_positions < positions.size()) ? zero_positions + rand() % (positions.size() - zero_positions) : rand() % positions.size();
+            int pos_i = (zero_positions < tests) ? zero_positions + rand() % (tests - zero_positions) : rand() % tests;
             int r_layer = positions[pos_i][0];
             int r_neuron = positions[pos_i][1];
             int r_weight = positions[pos_i][2];
             int r_bit = positions[pos_i][3];
-            iter_swap(positions.begin() + pos_i, positions.end() - 1);
-            positions.erase(positions.end() - 1);
+            iter_swap(positions.begin() + pos_i, positions.begin() + --tests);
 
             //change that bit + evaluate and see the new error
             int pos[3] = { r_layer,r_neuron,r_weight };
@@ -446,7 +449,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                     printUpdate(net, iterations, improving_iterations, clock(), best_err, false);
                 }
                 //reset positions
-                positions = trainingPositions(net, in);
+                trainingPositions(net, in, &positions);
+                tests = positions.size();
                 //reset stepper without giving the network == don't need to update the threshold
                 stepper.reset(NULL);
 
@@ -469,7 +473,7 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                 //reset change in weight
                 net->change(pos, r_bit);
                 //make a step and check result
-                if (positions.empty()/*stepper.needBitIncrease()*/) { //telescopic threshold reached
+                if (!tests/*stepper.needBitIncrease()*/) { //telescopic threshold reached
                     //save results obtained so far
                     cout << "Saving partial results..." << endl;
                     net->saveToFile(in, ex_set);
@@ -488,7 +492,9 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                         }
                     }
                     //reset positions
-                    positions = trainingPositions(net, in);
+                    positions.clear();
+                    trainingPositions(net, in, &positions);
+                    tests = positions.size();
                     //reset stepper completely == give network
                     stepper.reset(net);
                     //print update
