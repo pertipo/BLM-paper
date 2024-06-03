@@ -10,6 +10,7 @@
 #include <sstream>
 #include <random>
 #include <algorithm>
+#include <climits>
 
 namespace net {
     //TODO handle public fragments of classes
