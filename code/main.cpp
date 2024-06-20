@@ -264,7 +264,22 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
     log = ofstream(log_f);
     log << "Training sequence" << endl << "Iteration\tError" << endl;
     moves_log = ofstream(moves_log_f);
-    moves_log << "Training sequence" << endl << "Move[l,n,w,b]" << endl;
+    // moves_log << "Training sequence" << endl << "Move[l,n,w,b]" << endl;
+    for (auto l = net->neurons.begin(); l != net->neurons.end(); l++) {
+        moves_log << (*l).size() << " ";
+    }
+    moves_log << endl << pow(2, (*max_element(net->bit_limits.begin(), net->bit_limits.end()) -1)) << endl << endl;
+    unsigned k = 0;
+    for (auto l = net->neurons.begin()+1; l != net->neurons.end(); l++) {
+        for (auto n = (*l).begin(); n != (*l).end(); n++) {
+            for (auto w = (*n).weights_and_inputs.begin(); w != (*n).weights_and_inputs.end(); w++) {
+                if (get<1>(*w) != nullptr) {
+                    moves_log << k++ << " " << get<0>(*w).discrete << endl;
+                }
+            }
+        }
+    }
+    moves_log << endl;
     if (test_set != nullptr) {
         test_log = ofstream(test_log_f);
         test_log << "Generalization sequence" << endl << "Evaluation completed every: " << EVAL_AFTER_STEPS << " improvements" << endl << "Iteration\tError" << endl;
@@ -436,7 +451,8 @@ float train(Network* net, Init* in, ExampleSet* ex_set, ExampleSet* test_set) {
                 }
                 r_w_number += r_neuron * net->neurons[r_layer][0].weights_and_inputs.size();
                 r_w_number += r_weight;
-                moves_log << "[" << r_w_number << "," << r_bit << "]" << endl;
+                // moves_log << "[" << r_w_number << "," << r_bit << "]" << endl;
+                moves_log << r_w_number << " " << get<0>(net->neurons[r_layer][r_neuron].weights_and_inputs[r_weight]).discrete << endl;
                 //update best_error
                 best_err = err;
                 //recompute every output to erase any possible residues from previous moves
